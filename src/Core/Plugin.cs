@@ -108,7 +108,8 @@ public class Plugin : IDalamudPlugin
         FrontlineScoreReader = new FrontlineScoreReader(Configuration, framework, log, clientState, gameGui, dataManager, dutyState);
         AreaMapProjectionService = new AreaMapProjectionService(Configuration, gameGui, clientState, objectTable, dataManager, log);
         MapAnnotationService = new MapAnnotationService();
-        MapTacticalGraphService = new MapTacticalGraphService(dataManager, log);
+        var pluginAssemblyDirectory = PluginInterface.AssemblyLocation.Directory?.FullName ?? AppContext.BaseDirectory;
+        MapTacticalGraphService = new MapTacticalGraphService(dataManager, log, pluginAssemblyDirectory);
         MapTacticalAnalysisService = new MapTacticalAnalysisService(MapAnnotationService, MapTacticalGraphService);
         TacticalDecisionEngineService = new TacticalDecisionEngineService();
         LlmStrategicDecisionService = new LlmStrategicDecisionService(Configuration, log);

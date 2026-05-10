@@ -32,11 +32,11 @@ public sealed class MapTacticalGraphService
     private readonly string builtInDirectory;
     private readonly string rootDirectory;
 
-    public MapTacticalGraphService(IDataManager dataManager, IPluginLog log)
+    public MapTacticalGraphService(IDataManager dataManager, IPluginLog log, string pluginAssemblyDirectory)
     {
         this.dataManager = dataManager;
         this.log = log;
-        builtInDirectory = Path.Combine(AppContext.BaseDirectory, "BuiltInTacticalGraphs");
+        builtInDirectory = ResolveBuiltInDirectory(pluginAssemblyDirectory);
         rootDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "XIVLauncherCN",
@@ -46,6 +46,28 @@ public sealed class MapTacticalGraphService
     }
 
     public string RootDirectory => rootDirectory;
+
+    private static string ResolveBuiltInDirectory(string? pluginAssemblyDirectory)
+    {
+        var candidates = new[]
+        {
+            pluginAssemblyDirectory,
+            AppContext.BaseDirectory
+        };
+
+        foreach (var candidate in candidates)
+        {
+            if (string.IsNullOrWhiteSpace(candidate))
+                continue;
+
+            var path = Path.Combine(candidate, "BuiltInTacticalGraphs");
+            if (Directory.Exists(path))
+                return path;
+        }
+
+        var fallback = string.IsNullOrWhiteSpace(pluginAssemblyDirectory) ? AppContext.BaseDirectory : pluginAssemblyDirectory;
+        return Path.Combine(fallback, "BuiltInTacticalGraphs");
+    }
 
     public MapTacticalGraphSnapshot? Resolve(uint territoryType, uint mapId)
     {

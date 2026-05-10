@@ -6186,15 +6186,15 @@ public sealed class TacticalDecisionEngineService
                 commands,
                 "doctrine:counter-engage",
                 BattlefieldCommandKind.Hold,
-                "涓诲洟",
-                "鍏堟帴浣忓啀鍙嶅帇锛屽埆鍏堟妸鎶€鑳戒氦绌?",
+                "主团",
+                "先接住再反压，别先把技能交空",
                 Math.Clamp(64f + engagement.Score * 0.22f + enemyVulnerable * 3f, 0f, 94f),
                 Math.Clamp(66f + engagement.Score * 0.18f + friendlyToolsReady * 3f, 0f, 94f),
                 6,
                 teamSituation.EnemyMainGroupMovement.HasMainGroup ? teamSituation.EnemyMainGroupMovement.CurrentCenter : anchor,
-                fightPlan.IsAvailable ? fightPlan.TargetName : "鏁屾柟澶у洟",
-                "鎸囨尌瀹忚涔夛細鍙嶆墦鏄厛鎶婃晫鏂瑰紑鍥㈢獥鍙ｆ帴绌猴紝鍐嶇敤鎴戞柟鐖嗗彂鍥炲ご鍘?",
-                $"{engagement.EvidenceText}锛涙垜鏂瑰伐鍏?{friendlyToolsReady}锛涙晫鏂硅繎鏁?{teamSituation.Enemy.NearCount}");
+                fightPlan.IsAvailable ? fightPlan.TargetName : "敌方大团",
+                "指挥宏语义：反打是先把敌方开团窗口接空，再用我方爆发回头压",
+                $"{engagement.EvidenceText}；我方工具 {friendlyToolsReady}；近敌 {teamSituation.Enemy.NearCount}");
         }
 
         if (!fatal
@@ -6229,15 +6229,15 @@ public sealed class TacticalDecisionEngineService
                 commands,
                 "doctrine:single-target",
                 BattlefieldCommandKind.Engage,
-                "涓诲洟",
-                "鍏堝崟鐐规嬁鍑忓憳锛屽埆绌轰氦 AOE",
+                "主团",
+                "先单点击减员，别空交 AOE",
                 Math.Clamp(56f + engagement.Score * 0.18f + enemyVulnerable * 4f, 0f, 90f),
                 Math.Clamp(52f + enemyVulnerable * 6f + friendlyToolsReady * 2f, 0f, 88f),
                 6,
                 teamSituation.EnemyMainGroupMovement.HasMainGroup ? teamSituation.EnemyMainGroupMovement.CurrentCenter : anchor,
-                fightPlan.IsAvailable ? fightPlan.TargetName : "浣庤鐩爣",
-                "鎸囨尌瀹忚涔夛細娌℃湁绋冲畾 AOE 绐楀彛鏃讹紝鍏堢敤鍗曠偣闆嗙伀鎶婁汉鏁板帇鍑烘潵",
-                $"{engagement.EvidenceText}锛涙晫鏂硅剢寮?{enemyVulnerable}锛涙垜鏂瑰伐鍏?{friendlyToolsReady}");
+                fightPlan.IsAvailable ? fightPlan.TargetName : "低血目标",
+                "指挥宏语义：没有稳定 AOE 窗口时，先用单点集火把人数压出来",
+                $"{engagement.EvidenceText}；敌方脆点 {enemyVulnerable}；我方工具 {friendlyToolsReady}");
         }
 
         if (!fatal
@@ -6269,17 +6269,17 @@ public sealed class TacticalDecisionEngineService
                 commands,
                 "doctrine:resource-refresh",
                 BattlefieldCommandKind.Rotate,
-                "涓诲洟",
+                "主团",
                 timeSituation.NextResourceSeconds.Value <= 12
-                    ? $"鍋滄帀绌鸿拷锛岀珛鍒诲帇 {timeSituation.NextResourceName}"
-                    : $"鎾囧紑鎷夋壆锛屾彁鍓嶈浆 {timeSituation.NextResourceName}",
+                    ? $"停掉空追，立刻压 {timeSituation.NextResourceName}"
+                    : $"拉开拉扯，提前转 {timeSituation.NextResourceName}",
                 Math.Clamp(58f + (30 - timeSituation.NextResourceSeconds.Value) * 1.1f + risk.ScorePressure * 0.12f, 0f, 92f),
                 Math.Clamp(60f + (30 - timeSituation.NextResourceSeconds.Value) * 0.9f, 0f, 92f),
                 10,
                 primary.HasValue ? primary.Value.Position : Vector3.Zero,
                 timeSituation.NextResourceName,
-                "鎸囨尌瀹忚涔夛細璧勬簮鍒锋柊鍓嶅仠鎺夋病鏈夋敹鐩婄殑缂犳枟锛屾妸鑺傚鎻愬墠鍒囧埌涓嬩竴娉?",
-                $"涓嬩竴璧勬簮 {FormatDuration(timeSituation.NextResourceSeconds.Value)}锛涙潵婧?{timeSituation.NextResourceSource}");
+                "指挥宏语义：资源刷新前停掉没有收益的缠斗，把节奏提前切到下一波",
+                $"下一资源 {FormatDuration(timeSituation.NextResourceSeconds.Value)}；来源 {timeSituation.NextResourceSource}");
         }
 
         if (!fatal
@@ -6293,15 +6293,15 @@ public sealed class TacticalDecisionEngineService
                 commands,
                 "doctrine:wait-timing",
                 BattlefieldCommandKind.Wait,
-                "涓诲洟",
-                $"鍏堝崱浣嶇瓑 {timeSituation.NextResourceName}锛屽埆鍦ㄨ繖閲岀┖寮€",
+                "主团",
+                $"先卡位等 {timeSituation.NextResourceName}，别在这里空开",
                 Math.Clamp(54f + (22 - timeSituation.NextResourceSeconds.Value) * 1.4f + MathF.Max(risk.ThirdPartyPincerRisk, risk.SkillThreatRisk) * 0.08f, 0f, 90f),
                 Math.Clamp(56f + (22 - timeSituation.NextResourceSeconds.Value) * 1.1f, 0f, 88f),
                 8,
                 primary.HasValue ? primary.Value.Position : anchor,
                 timeSituation.NextResourceName,
-                "鎸囨尌瀹忚涔夛細绛夋椂鏈轰笉鏄師鍦版寕鏈猴紝鏄湪鍙粙鍏ヤ綅缃繚鐣欒祫婧愬拰杩涘満鏉?",
-                $"涓嬩竴璧勬簮 {FormatDuration(timeSituation.NextResourceSeconds.Value)}锛涚涓夋柟 {risk.ThirdPartyPincerRisk:0}锛涙妧鑳藉帇 {risk.SkillThreatRisk:0}");
+                "指挥宏语义：等时机不是原地挂机，是在可介入位置保留资源和进场点",
+                $"下一资源 {FormatDuration(timeSituation.NextResourceSeconds.Value)}；第三方 {risk.ThirdPartyPincerRisk:0}；技能压 {risk.SkillThreatRisk:0}");
         }
 
         if (!fatal

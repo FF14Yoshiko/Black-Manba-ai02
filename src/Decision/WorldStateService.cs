@@ -65,6 +65,7 @@ public sealed class WorldStateService : IDisposable
     private const long DerivedClusterRefreshIntervalMs = 2500;
     private const long MovementTrackRefreshIntervalMs = 3500;
     private const float ClusterSignatureQuantization = 4f;
+    private const int MaxObjectDiscoveryEntriesPerFrame = 18;
     private const int MaxObjectScanEntriesPerFrame = 6;
 
     private static readonly HashSet<uint> CountdownIconIds = new()
@@ -478,8 +479,6 @@ public sealed class WorldStateService : IDisposable
 
         lastRefreshTicks = now;
         StartRefreshSession(now);
-        if (activeWorldRefreshSession != null)
-            AdvanceRefreshSession(activeWorldRefreshSession, now);
     }
 
     private void StartRefreshSession(long now)
@@ -510,6 +509,7 @@ public sealed class WorldStateService : IDisposable
             return;
         }
 
+        var stageStartedTimestamp = Stopwatch.GetTimestamp();
         try
         {
             switch (session.Stage)
@@ -517,11 +517,32 @@ public sealed class WorldStateService : IDisposable
                 case WorldRefreshStage.CollectScene:
                     AdvanceRefreshSceneStage(session, now);
                     break;
+                case WorldRefreshStage.CollectMarkers:
+                    AdvanceRefreshMarkerStage(session, now);
+                    break;
+                case WorldRefreshStage.QueueContext:
+                    AdvanceRefreshContextStage(session, now);
+                    break;
+                case WorldRefreshStage.CollectVision:
+                    AdvanceRefreshVisionStage(session, now);
+                    break;
                 case WorldRefreshStage.CollectSignals:
                     AdvanceRefreshSignalStage(session, now);
                     break;
+                case WorldRefreshStage.UpdateHistory:
+                    AdvanceRefreshHistoryStage(session, now);
+                    break;
+                case WorldRefreshStage.QueueDerivedAnalyses:
+                    AdvanceRefreshDerivedStage(session, now);
+                    break;
                 case WorldRefreshStage.Assemble:
                     AdvanceRefreshAssembleStage(session, now);
+                    break;
+                case WorldRefreshStage.PrepareDecisionAssets:
+                    AdvanceRefreshDecisionAssetsStage(session, now);
+                    break;
+                case WorldRefreshStage.PrepareStatus:
+                    AdvanceRefreshStatusStage(session, now);
                     break;
                 case WorldRefreshStage.Finalize:
                     FinalizeRefreshSession(session, now);
@@ -540,6 +561,16 @@ public sealed class WorldStateService : IDisposable
                 MapId = clientState.MapId,
                 StatusText = cachedStatusText
             };
+        }
+        finally
+        {
+            session.AccumulatedWorkMs += Stopwatch.GetElapsedTime(stageStartedTimestamp).TotalMilliseconds;
+        }
+
+        if (session.ShouldLogCompletion)
+        {
+            session.ShouldLogCompletion = false;
+            LogSlowRefresh(now, session.StartedTimestamp, session.AccumulatedWorkMs);
         }
     }
 
@@ -611,8 +642,8 @@ public sealed class WorldStateService : IDisposable
             };
             latestSnapshot = BuildSnapshotWithLlmDecision(standbySnapshot, llmStrategicDecisionService.GetSnapshot(standbySnapshot));
             battlefieldReplayRecorder.Record(latestSnapshot);
+            session.ShouldLogCompletion = true;
             activeWorldRefreshSession = null;
-            LogSlowRefresh(now, session.StartedTimestamp);
             return;
         }
 
@@ -628,8 +659,18 @@ public sealed class WorldStateService : IDisposable
         session.Players = session.ObjectTableState.Players;
         session.ObjectiveActors = session.ObjectTableState.ObjectiveActors;
         session.MapEvents = CollectMapEvents();
+        session.Stage = WorldRefreshStage.CollectMarkers;
+    }
+
+    private void AdvanceRefreshMarkerStage(PendingWorldRefreshSession session, long now)
+    {
         session.FieldMarkers = CollectFieldMarkers();
         session.TargetMarkers = CollectTargetMarkers(session.Players);
+        session.Stage = WorldRefreshStage.QueueContext;
+    }
+
+    private void AdvanceRefreshContextStage(PendingWorldRefreshSession session, long now)
+    {
         QueueContextDerivedAnalysis(
             now,
             session.IsInFrontline,
@@ -644,31 +685,41 @@ public sealed class WorldStateService : IDisposable
         session.Objectives = cachedContextDerivedAnalysis.Objectives;
         session.MapObjectives = cachedContextDerivedAnalysis.MapObjectives;
         session.PlayerFrameEvents = cachedContextDerivedAnalysis.PlayerFrameEvents;
-        session.Stage = WorldRefreshStage.CollectSignals;
+        session.Stage = WorldRefreshStage.CollectVision;
     }
 
-    private void AdvanceRefreshSignalStage(PendingWorldRefreshSession session, long now)
+    private void AdvanceRefreshVisionStage(PendingWorldRefreshSession session, long now)
     {
         session.MapVisionPoints = CollectMapVisionPoints(session.IsInFrontline, now);
         QueueClusterDerivedAnalysis(now, session.IsInFrontline, session.Players, session.MapVisionPoints, session.LocalPlayer);
         session.PlayerClusters = cachedClusterDerivedAnalysis.PlayerClusters;
         session.MapVisionClusters = cachedClusterDerivedAnalysis.MapVisionClusters;
         session.LocalBattalion = session.LocalPlayer.HasValue ? NormalizeBattalion(session.LocalPlayer.Value.Battalion) : null;
+        session.Stage = WorldRefreshStage.CollectSignals;
+    }
+
+    private void AdvanceRefreshSignalStage(PendingWorldRefreshSession session, long now)
+    {
         session.ScoreSituation = BuildScoreSituation(session.ScoreSnapshot, session.Knowledge.CurrentMap, session.MapType, session.LocalBattalion, now);
         session.AnnouncementSituation = announcementReader.GetSnapshot(session.IsInFrontline, session.MapType);
         session.ChatEventSituation = chatEventReader.GetSnapshot(session.IsInFrontline, session.LocalBattalion);
         session.KeySkillLogEvents = keySkillEventReader.GetSnapshot(session.IsInFrontline, session.Knowledge);
         session.TimeSituation = BuildTimeSituation(session.ScoreSnapshot, session.Knowledge.CurrentMap, session.MapObjectives, session.AnnouncementSituation);
         session.LimitBreak = limitBreakService.GetSnapshot(session.IsInFrontline);
-        session.Stage = WorldRefreshStage.Assemble;
+        session.Stage = WorldRefreshStage.UpdateHistory;
     }
 
-    private void AdvanceRefreshAssembleStage(PendingWorldRefreshSession session, long now)
+    private void AdvanceRefreshHistoryStage(PendingWorldRefreshSession session, long now)
     {
         UpdatePlayerHistory(session.Players, session.Knowledge, now);
         PrunePlayerHistory(now);
         ImportKeySkillLogEvents(session.Players, session.KeySkillLogEvents, now);
         PruneKeySkillUseHistory(now);
+        session.Stage = WorldRefreshStage.QueueDerivedAnalyses;
+    }
+
+    private void AdvanceRefreshDerivedStage(PendingWorldRefreshSession session, long now)
+    {
         QueueTeamDerivedAnalysis(
             now,
             session.IsInFrontline,
@@ -686,6 +737,11 @@ public sealed class WorldStateService : IDisposable
             session.TimeSituation,
             session.LimitBreak,
             session.KeySkillLogEvents);
+        session.Stage = WorldRefreshStage.Assemble;
+    }
+
+    private void AdvanceRefreshAssembleStage(PendingWorldRefreshSession session, long now)
+    {
         session.NormalizedAlliances = BuildAllianceData(session.ScoreSituation, session.ScoreSnapshot.Alliances);
         session.TeamSituation = BuildTeamSituation(
             session.Players,
@@ -706,21 +762,26 @@ public sealed class WorldStateService : IDisposable
             && (!session.CanReuseDecisionLayer
             || !latestSnapshot.Decision.IsAvailable
             || now - lastStrategicDecisionRefreshTicks >= decisionIntervalMs);
+        session.MapTactics = session.CanReuseDecisionLayer ? latestSnapshot.MapTactics : new BattlefieldMapTacticsSnapshot();
+        session.Decision = session.CanReuseDecisionLayer ? latestSnapshot.Decision : new BattlefieldDecisionSnapshot();
+        session.TeamSituation.AdvancedTactics = session.CanReuseDecisionLayer
+            ? latestSnapshot.TeamSituation.AdvancedTactics
+            : new BattlefieldAdvancedTacticalSituationSnapshot();
+        session.Stage = WorldRefreshStage.PrepareDecisionAssets;
+    }
+
+    private void AdvanceRefreshDecisionAssetsStage(PendingWorldRefreshSession session, long now)
+    {
         session.PlayerTracks = session.ShouldQueueDecisionLayer
             ? BuildPlayerTracks(now)
             : session.CanReuseDecisionLayer ? latestSnapshot.PlayerTracks : Array.Empty<BattlefieldPlayerTrackSnapshot>();
         session.EnemyMainGroupTrack = session.ShouldQueueDecisionLayer
             ? BuildEnemyMainGroupTrack(now)
             : session.CanReuseDecisionLayer ? latestSnapshot.EnemyMainGroupTrack : Array.Empty<BattlefieldGroupTrackSnapshot>();
-        session.MapTactics = session.CanReuseDecisionLayer ? latestSnapshot.MapTactics : new BattlefieldMapTacticsSnapshot();
-        session.Decision = session.CanReuseDecisionLayer ? latestSnapshot.Decision : new BattlefieldDecisionSnapshot();
-        session.TeamSituation.AdvancedTactics = session.CanReuseDecisionLayer
-            ? latestSnapshot.TeamSituation.AdvancedTactics
-            : new BattlefieldAdvancedTacticalSituationSnapshot();
-        session.Stage = WorldRefreshStage.Finalize;
+        session.Stage = WorldRefreshStage.PrepareStatus;
     }
 
-    private void FinalizeRefreshSession(PendingWorldRefreshSession session, long now)
+    private void AdvanceRefreshStatusStage(PendingWorldRefreshSession session, long now)
     {
         if (string.IsNullOrWhiteSpace(cachedStatusText) || now - lastStatusTextRefreshTicks >= StatusTextRefreshIntervalMs)
         {
@@ -746,6 +807,11 @@ public sealed class WorldStateService : IDisposable
             lastStatusTextRefreshTicks = now;
         }
 
+        session.Stage = WorldRefreshStage.Finalize;
+    }
+
+    private void FinalizeRefreshSession(PendingWorldRefreshSession session, long now)
+    {
         latestSnapshot = new BattlefieldSnapshot
         {
             UpdatedAtTicks = now,
@@ -796,8 +862,8 @@ public sealed class WorldStateService : IDisposable
         }
 
         battlefieldReplayRecorder.Record(latestSnapshot);
+        session.ShouldLogCompletion = true;
         activeWorldRefreshSession = null;
-        LogSlowRefresh(now, session.StartedTimestamp);
     }
 
     private void Refresh()
@@ -1032,9 +1098,10 @@ public sealed class WorldStateService : IDisposable
         }
     }
 
-    private void LogSlowRefresh(long now, long startedTimestamp)
+    private void LogSlowRefresh(long now, long startedTimestamp, double? measuredWorkMs = null)
     {
-        var elapsedMs = Stopwatch.GetElapsedTime(startedTimestamp).TotalMilliseconds;
+        var wallMs = Stopwatch.GetElapsedTime(startedTimestamp).TotalMilliseconds;
+        var elapsedMs = measuredWorkMs ?? wallMs;
         if (elapsedMs < SlowRefreshWarningMs || now - lastSlowRefreshLogTicks < SlowRefreshLogCooldownMs)
             return;
 
@@ -1043,8 +1110,9 @@ public sealed class WorldStateService : IDisposable
         if (backoffMs > 0)
             adaptiveWorldRefreshBackoffUntilTicks = Math.Max(adaptiveWorldRefreshBackoffUntilTicks, now + backoffMs);
         log.Debug(
-            "[WorldState] Slow refresh: {ElapsedMs:F1}ms, players={PlayerCount}, enemies={EnemyCount}, mapVision={MapVisionCount}, decision={DecisionAvailable}, tactics={TacticsAvailable}",
+            "[WorldState] Slow refresh: work={ElapsedMs:F1}ms, wall={WallMs:F1}ms, players={PlayerCount}, enemies={EnemyCount}, mapVision={MapVisionCount}, decision={DecisionAvailable}, tactics={TacticsAvailable}",
             elapsedMs,
+            wallMs,
             latestSnapshot.Players.Length,
             latestSnapshot.EnemyPlayerCount,
             latestSnapshot.MapVisionPoints.Length,
@@ -1152,23 +1220,46 @@ public sealed class WorldStateService : IDisposable
             clientState.MapId,
             isInFrontline,
             mapType,
-            BuildIncrementalObjectScanEntries(mapType),
             localGameObjectId,
             localBattalion,
             localPosition,
             hasLocalPosition,
             battleHighLevelByStatusId,
             tacticalStatusIdSets,
+            new List<TrackedObjectTableEntry>(128),
+            new HashSet<ulong>(),
             new List<BattlefieldPlayerSnapshot>(96),
             mapType == FrontlineMapType.Unknown ? null : new List<BattlefieldObjectiveActorSnapshot>(16));
     }
 
     private void ProcessIncrementalObjectScanBatch(IncrementalObjectScanSession session, long now)
     {
+        DiscoverIncrementalObjectScanEntries(session);
+
         var batchStart = session.NextIndex;
-        var batchEnd = Math.Min(session.ObjectEntries.Length, batchStart + MaxObjectScanEntriesPerFrame);
+        var batchEnd = Math.Min(session.ObjectEntries.Count, batchStart + MaxObjectScanEntriesPerFrame);
         if (batchStart >= batchEnd)
+        {
+            if (session.SourceNextIndex < objectTable.Length)
+                return;
+
+            CacheObjectTableSnapshot(
+                new ObjectTableSnapshot(
+                    session.Players.ToArray(),
+                    session.ObjectiveActors == null
+                        ? Array.Empty<BattlefieldObjectiveActorSnapshot>()
+                        : session.ObjectiveActors
+                            .OrderBy(actor => actor.Category)
+                            .ThenBy(actor => actor.DistanceToLocal)
+                            .ToArray(),
+                    session.LocalPlayer),
+                session.MapType,
+                session.IsInFrontline,
+                now);
+            activeObjectScan = null;
             return;
+        }
+
         session.NextIndex = batchEnd;
 
         for (var i = batchStart; i < batchEnd; i++)
@@ -1207,7 +1298,7 @@ public sealed class WorldStateService : IDisposable
             }
         }
 
-        if (session.NextIndex < session.ObjectEntries.Length)
+        if (session.SourceNextIndex < objectTable.Length || session.NextIndex < session.ObjectEntries.Count)
             return;
 
         CacheObjectTableSnapshot(
@@ -1224,6 +1315,24 @@ public sealed class WorldStateService : IDisposable
             session.IsInFrontline,
             now);
         activeObjectScan = null;
+    }
+
+    private void DiscoverIncrementalObjectScanEntries(IncrementalObjectScanSession session)
+    {
+        var includeObjectiveActors = session.MapType != FrontlineMapType.Unknown;
+        var batchStart = session.SourceNextIndex;
+        var batchEnd = Math.Min(objectTable.Length, batchStart + MaxObjectDiscoveryEntriesPerFrame);
+        session.SourceNextIndex = batchEnd;
+
+        for (var index = batchStart; index < batchEnd; index++)
+        {
+            var obj = objectTable[index];
+            if (!ShouldTrackObjectForWorldStateScan(obj, includeObjectiveActors))
+                continue;
+
+            if (session.SeenObjectIds.Add(obj!.GameObjectId))
+                session.ObjectEntries.Add(new TrackedObjectTableEntry(index, obj.GameObjectId));
+        }
     }
 
     private void CacheObjectTableSnapshot(
@@ -1249,25 +1358,6 @@ public sealed class WorldStateService : IDisposable
         cachedObjectTableMapId = 0;
         cachedObjectTableIsInFrontline = false;
         lastObjectScanCompletedTicks = 0;
-    }
-
-    private TrackedObjectTableEntry[] BuildIncrementalObjectScanEntries(FrontlineMapType mapType)
-    {
-        var includeObjectiveActors = mapType != FrontlineMapType.Unknown;
-        var objectEntries = new List<TrackedObjectTableEntry>(128);
-        var seen = new HashSet<ulong>();
-
-        for (var index = 0; index < objectTable.Length; index++)
-        {
-            var obj = objectTable[index];
-            if (!ShouldTrackObjectForWorldStateScan(obj, includeObjectiveActors))
-                continue;
-
-            if (seen.Add(obj!.GameObjectId))
-                objectEntries.Add(new TrackedObjectTableEntry(index, obj.GameObjectId));
-        }
-
-        return objectEntries.ToArray();
     }
 
     private bool TryGetTrackedObjectByTableEntry(TrackedObjectTableEntry entry, out IGameObject? obj)
@@ -1356,23 +1446,6 @@ public sealed class WorldStateService : IDisposable
             return;
 
         var players = objectTableState.Players;
-        var fieldMarkers = CollectFieldMarkers();
-        var targetMarkers = CollectTargetMarkers(players);
-        var keySkillLogEvents = keySkillEventReader.GetSnapshot(snapshot.IsInFrontline, snapshot.Knowledge);
-
-        UpdatePlayerHistory(players, snapshot.Knowledge, now);
-        PrunePlayerHistory(now);
-        ImportKeySkillLogEvents(players, keySkillLogEvents, now);
-        PruneKeySkillUseHistory(now);
-        QueueThreatAnalysis(
-            now,
-            snapshot.IsInFrontline,
-            players,
-            snapshot.ScoreSituation,
-            snapshot.Knowledge,
-            snapshot.TimeSituation,
-            snapshot.LimitBreak,
-            keySkillLogEvents);
 
         QueueDecisionRefresh(new PendingDecisionRefresh
         {
@@ -1385,8 +1458,8 @@ public sealed class WorldStateService : IDisposable
             MapName = snapshot.Knowledge.CurrentMap?.Name ?? snapshot.ScoreSituation.MapName,
             LocalPlayer = objectTableState.LocalPlayer,
             Players = players,
-            FieldMarkers = fieldMarkers,
-            TargetMarkers = targetMarkers,
+            FieldMarkers = snapshot.FieldMarkers,
+            TargetMarkers = snapshot.TargetMarkers,
             MapEvents = snapshot.MapEvents,
             MapVisionPoints = snapshot.MapVisionPoints,
             MapVisionClusters = snapshot.MapVisionClusters,
@@ -1401,7 +1474,7 @@ public sealed class WorldStateService : IDisposable
             AnnouncementSituation = snapshot.AnnouncementSituation,
             ChatEventSituation = snapshot.ChatEventSituation,
             PlayerFrameEvents = snapshot.PlayerFrameEvents,
-            KeySkillLogEvents = keySkillLogEvents,
+            KeySkillLogEvents = new BattlefieldKeySkillLogEventSituationSnapshot(),
             Knowledge = snapshot.Knowledge,
             MapTactics = snapshot.MapTactics,
             LimitBreakThreats = cachedLimitBreakThreats,
@@ -9285,8 +9358,15 @@ public sealed class WorldStateService : IDisposable
     private enum WorldRefreshStage
     {
         CollectScene,
+        CollectMarkers,
+        QueueContext,
+        CollectVision,
         CollectSignals,
+        UpdateHistory,
+        QueueDerivedAnalyses,
         Assemble,
+        PrepareDecisionAssets,
+        PrepareStatus,
         Finalize
     }
 
@@ -9294,6 +9374,8 @@ public sealed class WorldStateService : IDisposable
     {
         public long StartedAtTicks { get; init; }
         public long StartedTimestamp { get; init; }
+        public double AccumulatedWorkMs { get; set; }
+        public bool ShouldLogCompletion { get; set; }
         public uint TerritoryType { get; init; }
         public uint MapId { get; init; }
         public bool IsAreaTransitioning { get; init; }
@@ -9578,13 +9660,14 @@ public sealed class WorldStateService : IDisposable
             uint mapId,
             bool isInFrontline,
             FrontlineMapType mapType,
-            TrackedObjectTableEntry[] objectEntries,
             ulong localGameObjectId,
             byte localBattalion,
             Vector3 localPosition,
             bool hasLocalPosition,
             IReadOnlyDictionary<uint, int> battleHighLevelByStatusId,
             TacticalStatusIdSets tacticalStatusIdSets,
+            List<TrackedObjectTableEntry> objectEntries,
+            HashSet<ulong> seenObjectIds,
             List<BattlefieldPlayerSnapshot> players,
             List<BattlefieldObjectiveActorSnapshot>? objectiveActors)
         {
@@ -9599,6 +9682,7 @@ public sealed class WorldStateService : IDisposable
             HasLocalPosition = hasLocalPosition;
             BattleHighLevelByStatusId = battleHighLevelByStatusId;
             TacticalStatusIdSets = tacticalStatusIdSets;
+            SeenObjectIds = seenObjectIds;
             Players = players;
             ObjectiveActors = objectiveActors;
         }
@@ -9607,15 +9691,17 @@ public sealed class WorldStateService : IDisposable
         public uint MapId { get; }
         public bool IsInFrontline { get; }
         public FrontlineMapType MapType { get; }
-        public TrackedObjectTableEntry[] ObjectEntries { get; }
         public ulong LocalGameObjectId { get; }
         public byte LocalBattalion { get; }
         public Vector3 LocalPosition { get; }
         public bool HasLocalPosition { get; }
         public IReadOnlyDictionary<uint, int> BattleHighLevelByStatusId { get; }
         public TacticalStatusIdSets TacticalStatusIdSets { get; }
+        public List<TrackedObjectTableEntry> ObjectEntries { get; }
+        public HashSet<ulong> SeenObjectIds { get; }
         public List<BattlefieldPlayerSnapshot> Players { get; }
         public List<BattlefieldObjectiveActorSnapshot>? ObjectiveActors { get; }
+        public int SourceNextIndex { get; set; }
         public int NextIndex { get; set; }
         public BattlefieldPlayerSnapshot? LocalPlayer { get; set; }
     }

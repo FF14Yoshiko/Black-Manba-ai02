@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Numerics;
+using System.Text.Encodings.Web;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -21,6 +22,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
     private const int MaxPromptInsights = 5;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = true,
         WriteIndented = false
@@ -175,6 +177,10 @@ public sealed class LlmStrategicDecisionService : IDisposable
             UserPrompt = userPrompt,
             RawResponse = rawResponse,
             ParsedJson = parsedJson,
+            DebugText = runtime.DebugText,
+            DebugScoreRead = runtime.DebugScoreRead,
+            DebugPositionRead = runtime.DebugPositionRead,
+            DebugLatencyNote = runtime.DebugLatencyNote,
             ErrorText = runtime.ErrorText,
             RequestedAtTicks = runtime.RequestedAtTicks,
             ReceivedAtTicks = responseTicks >= 0 ? responseTicks : runtime.ReceivedAtTicks,
@@ -278,7 +284,8 @@ public sealed class LlmStrategicDecisionService : IDisposable
             }
         }
 
-        lastMatchTimeRemaining = snapshot.MatchTimeRemaining;
+        if (snapshot.TimeSituation.HasMatchTime && snapshot.MatchTimeRemaining > 0)
+            lastMatchTimeRemaining = snapshot.MatchTimeRemaining;
     }
 
     private void ResetSession(string reason)
@@ -411,8 +418,8 @@ public sealed class LlmStrategicDecisionService : IDisposable
         var time = snapshot.TimeSituation;
         var input = decision.DecisionQuality.InputReliability;
         var risk = decision.RiskAssessment;
-        var reliabilityThreshold = 30f;
-        var playerReliabilityThreshold = 28f;
+        var reliabilityThreshold = 20f;
+        var playerReliabilityThreshold = 18f;
 
         if (!decision.IsAvailable)
             return LlmGateResult.None("本地决策层尚未形成，先不上传");
@@ -438,10 +445,10 @@ public sealed class LlmStrategicDecisionService : IDisposable
         var enemyPairEta = enemyPair.HasValue ? EstimateEtaSeconds(Distance2D(localCenter, enemyPairMid)) : 999;
         var scoreBalanced = IsScoreBalanced(score);
         var objectiveNearAndLowRisk = primary.HasValue
-            && primary.Value.MountedEtaSeconds <= 10
-            && primary.Value.RiskScore <= 38f
-            && primary.Value.PriorityScore <= 52f
-            && scorePressure < 14f;
+            && primary.Value.MountedEtaSeconds <= 8
+            && primary.Value.RiskScore <= 30f
+            && primary.Value.PriorityScore <= 46f
+            && scorePressure < 10f;
 
         if (enemyPair.HasValue
             && enemyPairDistance <= 90f
@@ -449,15 +456,25 @@ public sealed class LlmStrategicDecisionService : IDisposable
             && objectiveNearAndLowRisk
             && scoreBalanced)
         {
-            return LlmGateResult.None("两家敌方交战较远，我方附近有低风险目标，本地状态机执行即可");
+            return BuildGate(
+                BattlefieldLlmDecisionNeedKind.RoutineStrategicPulse,
+                "两家敌方交战较远，我方附近有低风险目标；允许 AI 作为常规战略采样补充判断",
+                44f,
+                snapshot,
+                enemyCenters);
         }
 
         if (objectiveNearAndLowRisk
-            && risk.OverallRisk <= 36f
+            && risk.OverallRisk <= 32f
             && !snapshot.TeamSituation.AdvancedTactics.IsThirdPartyPincerLikely
-            && closestEnemyDistance > 165f)
+            && closestEnemyDistance > 190f)
         {
-            return LlmGateResult.None("当前目标近、风险低、比分压力不高，本地大决策足够");
+            return BuildGate(
+                BattlefieldLlmDecisionNeedKind.RoutineStrategicPulse,
+                "当前目标近、风险低、比分压力不高；允许 AI 参与常规局势采样",
+                40f,
+                snapshot,
+                enemyCenters);
         }
 
         if (IsEndgameConflict(score, time, out var endgameReason))
@@ -471,9 +488,9 @@ public sealed class LlmStrategicDecisionService : IDisposable
         }
 
         if (enemyPair.HasValue
-            && enemyPairDistance <= 120f
-            && enemyPairEta <= 24
-            && (scorePressure >= 8f || risk.ThirdPartyPincerRisk >= 32f || primary.HasValue && primary.Value.MountedEtaSeconds <= 36))
+            && enemyPairDistance <= 135f
+            && enemyPairEta <= 30
+            && (scorePressure >= 6f || risk.ThirdPartyPincerRisk >= 26f || primary.HasValue && primary.Value.MountedEtaSeconds <= 42))
         {
             return BuildGate(
                 BattlefieldLlmDecisionNeedKind.NearbyThirdPartyFight,
@@ -484,10 +501,10 @@ public sealed class LlmStrategicDecisionService : IDisposable
         }
 
         if (primary.HasValue
-            && primary.Value.MountedEtaSeconds >= 18
-            && closestEnemyDistance <= 155f
-            && primary.Value.PriorityScore >= 42f
-            && (scorePressure >= 8f || IsHighValueObjective(primary.Value) || risk.ObjectiveRisk >= 38f))
+            && primary.Value.MountedEtaSeconds >= 14
+            && closestEnemyDistance <= 175f
+            && primary.Value.PriorityScore >= 34f
+            && (scorePressure >= 6f || IsHighValueObjective(primary.Value) || risk.ObjectiveRisk >= 30f))
         {
             return BuildGate(
                 BattlefieldLlmDecisionNeedKind.FarObjectiveWithCloseEnemies,
@@ -499,9 +516,9 @@ public sealed class LlmStrategicDecisionService : IDisposable
 
         if (primary.HasValue
             && primary.Value.State is BattlefieldMapObjectiveState.Warning or BattlefieldMapObjectiveState.Active or BattlefieldMapObjectiveState.Contested
-            && primary.Value.MountedEtaSeconds <= 48
-            && primary.Value.PriorityScore >= 50f
-            && (primary.Value.RiskScore >= 34f || primary.Value.PressureScore >= 44f || risk.ObjectiveRisk >= 40f))
+            && primary.Value.MountedEtaSeconds <= 58
+            && primary.Value.PriorityScore >= 44f
+            && (primary.Value.RiskScore >= 30f || primary.Value.PressureScore >= 38f || risk.ObjectiveRisk >= 34f))
         {
             return BuildGate(
                 BattlefieldLlmDecisionNeedKind.ObjectiveRace,
@@ -514,8 +531,8 @@ public sealed class LlmStrategicDecisionService : IDisposable
         if ((snapshot.TeamSituation.IsEnemySplit
                 || snapshot.TeamSituation.AdvancedTactics.IsThirdPartyPincerLikely
                 || snapshot.TeamSituation.AdvancedTactics.IsHighGroundDropPrepLikely
-                || risk.ThirdPartyPincerRisk >= 40f)
-            && scorePressure >= 8f)
+                || risk.ThirdPartyPincerRisk >= 34f)
+            && (scorePressure >= 5f || primary.HasValue && primary.Value.PriorityScore >= 42f || risk.OverallRisk >= 38f))
         {
             return BuildGate(
                 BattlefieldLlmDecisionNeedKind.UnstableThreeFaction,
@@ -545,7 +562,12 @@ public sealed class LlmStrategicDecisionService : IDisposable
                 enemyCenters);
         }
 
-        return LlmGateResult.None("未命中高层复杂局势，本地最低风险大决策继续执行");
+        return BuildGate(
+            BattlefieldLlmDecisionNeedKind.RoutineStrategicPulse,
+            "当前未命中特典型复杂局势，但仍允许 AI 参与常规战略采样",
+            Math.Clamp(42f + scorePressure * 0.25f + (primary.HasValue ? 6f : 0f) + (closestEnemyDistance <= 220f ? 6f : 0f), 0f, 72f),
+            snapshot,
+            enemyCenters);
     }
 
     private LlmGateResult BuildGate(
@@ -585,18 +607,20 @@ public sealed class LlmStrategicDecisionService : IDisposable
                 failureReason = "已有 AI 请求在进行中，等这一条回来再发。";
                 return false;
             }
-            if (!ignoreRateLimit && lastRequestTicks >= 0 && now - lastRequestTicks < config.MinIntervalSeconds * 1000L)
+            var minIntervalMs = ResolveMinIntervalMs(config, gate);
+            if (!ignoreRateLimit && lastRequestTicks >= 0 && now - lastRequestTicks < minIntervalMs)
             {
-                var remaining = Math.Max(1, (int)Math.Ceiling((config.MinIntervalSeconds * 1000L - (now - lastRequestTicks)) / 1000d));
+                var remaining = Math.Max(1, (int)Math.Ceiling((minIntervalMs - (now - lastRequestTicks)) / 1000d));
                 failureReason = $"最小请求间隔还没到，请再等 {remaining} 秒。";
                 return false;
             }
+            var sameSituationCooldownMs = ResolveSameSituationCooldownMs(config, gate);
             if (!ignoreRateLimit
                 && string.Equals(lastRequestSituationKey, gate.SituationKey, StringComparison.Ordinal)
                 && lastRequestTicks >= 0
-                && now - lastRequestTicks < config.SameSituationCooldownSeconds * 1000L)
+                && now - lastRequestTicks < sameSituationCooldownMs)
             {
-                var remaining = Math.Max(1, (int)Math.Ceiling((config.SameSituationCooldownSeconds * 1000L - (now - lastRequestTicks)) / 1000d));
+                var remaining = Math.Max(1, (int)Math.Ceiling((sameSituationCooldownMs - (now - lastRequestTicks)) / 1000d));
                 failureReason = $"同局势冷却还没到，请再等 {remaining} 秒。";
                 return false;
             }
@@ -765,6 +789,9 @@ public sealed class LlmStrategicDecisionService : IDisposable
         var confidence = GetFloat(root, 72f, "confidence", "置信度");
         var risk = GetFloat(root, 50f, "risk", "风险");
         var debugText = GetDebugText(root);
+        var debugScoreRead = GetDebugField(root, "score_read", "scoreRead", "比分读取", "score");
+        var debugPositionRead = GetDebugField(root, "position_read", "positionRead", "位置读取", "position");
+        var debugLatencyNote = GetDebugField(root, "latency_note", "latencyNote", "延迟说明", "latency");
         var now = receivedAtTicks >= 0 ? receivedAtTicks : Environment.TickCount64;
 
         if (string.IsNullOrWhiteSpace(decisionText))
@@ -790,6 +817,9 @@ public sealed class LlmStrategicDecisionService : IDisposable
             Confidence = Math.Clamp(confidence, 0f, 100f),
             Risk = Math.Clamp(risk, 0f, 100f),
             DebugText = Truncate(debugText, 600),
+            DebugScoreRead = Truncate(debugScoreRead, 260),
+            DebugPositionRead = Truncate(debugPositionRead, 260),
+            DebugLatencyNote = Truncate(debugLatencyNote, 220),
             RawJson = Truncate(responseJson, 1200),
             RequestedAtTicks = context.RequestedAtTicks,
             ReceivedAtTicks = now,
@@ -849,6 +879,16 @@ public sealed class LlmStrategicDecisionService : IDisposable
         var risk = decision.RiskAssessment;
         var input = decision.DecisionQuality.InputReliability;
         var map = snapshot.Knowledge.CurrentMap;
+        int? effectiveMatchRemainingSeconds = snapshot.TimeSituation.HasMatchTime
+            ? snapshot.MatchTimeRemaining
+            : lastMatchTimeRemaining > 0
+                ? lastMatchTimeRemaining
+                : null;
+        var effectivePhaseDetail = snapshot.TimeSituation.HasMatchTime
+            ? snapshot.TimeSituation.MatchPhaseDetail
+            : snapshot.IsInFrontline
+                ? "对局进行中（时间读数暂缺）"
+                : snapshot.TimeSituation.MatchPhaseDetail;
 
         return new
         {
@@ -858,8 +898,8 @@ public sealed class LlmStrategicDecisionService : IDisposable
                 map = !string.IsNullOrWhiteSpace(score.MapName) ? score.MapName : map?.Name ?? snapshot.MapTactics.MapName,
                 territory = snapshot.TerritoryType,
                 map_id = snapshot.MapId,
-                match_remaining_seconds = snapshot.MatchTimeRemaining,
-                phase = snapshot.TimeSituation.MatchPhaseDetail,
+                match_remaining_seconds = effectiveMatchRemainingSeconds,
+                phase = effectivePhaseDetail,
                 previous_ai_decisions = previousTurns.Select(turn => new
                 {
                     match_remaining_seconds = turn.MatchRemainingSeconds,
@@ -1226,7 +1266,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
 
         var gap = Math.Abs(enemyLeaders[0].Score - enemyLeaders[1].Score);
         var hasFightAndObjective = decision.FightPriorityTarget.HasValue && decision.ObjectivePriorityTarget.HasValue;
-        if (gap <= 140 && hasFightAndObjective && decision.RiskAssessment.OverallRisk >= 42f)
+        if (gap <= 180 && hasFightAndObjective && decision.RiskAssessment.OverallRisk >= 34f)
         {
             reason = $"两家敌方比分接近（差 {gap}），本地同时存在打团线和拿点线，需要判断优先打谁";
             return true;
@@ -1245,19 +1285,19 @@ public sealed class LlmStrategicDecisionService : IDisposable
         out string reason,
         out float urgency)
     {
-        var enemyClose = closestEnemyDistance <= 170f;
+        var enemyClose = closestEnemyDistance <= 190f;
         var objectiveLive = primary.HasValue
-            && primary.Value.MountedEtaSeconds <= 55
-            && primary.Value.PriorityScore >= 36f;
-        var scoreMatters = scorePressure >= 8f;
+            && primary.Value.MountedEtaSeconds <= 65
+            && primary.Value.PriorityScore >= 32f;
+        var scoreMatters = scorePressure >= 5f;
         var tacticalNoise = snapshot.TeamSituation.IsEnemySplit
             || snapshot.TeamSituation.AdvancedTactics.IsThirdPartyPincerLikely
             || snapshot.TeamSituation.AdvancedTactics.IsHighGroundDropPrepLikely
             || snapshot.TeamSituation.AdvancedTactics.IsCoordinatedSquadLikely
-            || risk.ThirdPartyPincerRisk >= 34f
-            || risk.ObjectiveRisk >= 38f
-            || risk.OverallRisk >= 42f;
-        var fightReachableSoon = enemyPairEta <= 28;
+            || risk.ThirdPartyPincerRisk >= 28f
+            || risk.ObjectiveRisk >= 32f
+            || risk.OverallRisk >= 36f;
+        var fightReachableSoon = enemyPairEta <= 34;
         var signalCount = 0;
         signalCount += enemyClose ? 1 : 0;
         signalCount += objectiveLive ? 1 : 0;
@@ -1280,14 +1320,14 @@ public sealed class LlmStrategicDecisionService : IDisposable
             : "未知";
         reason = $"当前局势具备中等复杂度（近敌 {enemyText} / 目标 {objectiveText} / 比分压力 {scorePressure:0}），进入 AI 联调采样";
         urgency = Math.Clamp(
-            48f
+            54f
             + scorePressure * 0.55f
             + (enemyClose ? 8f : 0f)
             + (objectiveLive ? 8f : 0f)
             + (tacticalNoise ? 10f : 0f)
             + (fightReachableSoon ? 6f : 0f),
             0f,
-            88f);
+            92f);
         return true;
     }
 
@@ -1346,6 +1386,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
         => kind switch
         {
             BattlefieldLlmDecisionNeedKind.ManualProbe => "手动测试/对话",
+            BattlefieldLlmDecisionNeedKind.RoutineStrategicPulse => "常规战略采样",
             BattlefieldLlmDecisionNeedKind.StrategicSampling => "AI 联调采样",
             BattlefieldLlmDecisionNeedKind.NearbyThirdPartyFight => "近处三方参战判断",
             BattlefieldLlmDecisionNeedKind.FarObjectiveWithCloseEnemies => "远目标与近敌冲突",
@@ -1417,6 +1458,15 @@ public sealed class LlmStrategicDecisionService : IDisposable
         return value.GetRawText();
     }
 
+    private static string GetDebugField(JsonElement root, params string[] names)
+    {
+        if (!TryGetProperty(root, "debug", out var value) && !TryGetProperty(root, "调试", out value))
+            return string.Empty;
+        if (value.ValueKind != JsonValueKind.Object)
+            return string.Empty;
+        return GetString(value, names);
+    }
+
     private static bool TryGetProperty(JsonElement root, string name, out JsonElement value)
     {
         foreach (var property in root.EnumerateObject())
@@ -1438,6 +1488,30 @@ public sealed class LlmStrategicDecisionService : IDisposable
             return string.Empty;
         text = text.Trim();
         return text.Length <= maxChars ? text : text[..Math.Max(0, maxChars - 1)] + "…";
+    }
+
+    private static long ResolveMinIntervalMs(LlmDecisionConfiguration config, LlmGateResult gate)
+    {
+        var baseMs = Math.Max(3000L, config.MinIntervalSeconds * 1000L);
+        if (gate.Urgency >= 88f)
+            return Math.Max(3000L, (long)(baseMs * 0.5f));
+        if (gate.Urgency >= 76f)
+            return Math.Max(4000L, (long)(baseMs * 0.65f));
+        if (gate.Urgency >= 62f)
+            return Math.Max(5000L, (long)(baseMs * 0.8f));
+        return baseMs;
+    }
+
+    private static long ResolveSameSituationCooldownMs(LlmDecisionConfiguration config, LlmGateResult gate)
+    {
+        var baseMs = Math.Max(5000L, config.SameSituationCooldownSeconds * 1000L);
+        if (gate.Urgency >= 88f)
+            return Math.Max(6000L, (long)(baseMs * 0.45f));
+        if (gate.Urgency >= 76f)
+            return Math.Max(8000L, (long)(baseMs * 0.6f));
+        if (gate.Urgency >= 62f)
+            return Math.Max(10000L, (long)(baseMs * 0.75f));
+        return baseMs;
     }
 
     private void ClearDebugArtifacts()

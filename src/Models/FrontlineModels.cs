@@ -1293,6 +1293,7 @@ public enum BattlefieldLlmDecisionNeedKind
 {
     None,
     ManualProbe,
+    RoutineStrategicPulse,
     StrategicSampling,
     NearbyThirdPartyFight,
     FarObjectiveWithCloseEnemies,
@@ -1495,6 +1496,9 @@ public sealed class BattlefieldLlmStrategicDecisionSnapshot
     public float Confidence { get; init; }
     public float Risk { get; init; }
     public string DebugText { get; init; } = string.Empty;
+    public string DebugScoreRead { get; init; } = string.Empty;
+    public string DebugPositionRead { get; init; } = string.Empty;
+    public string DebugLatencyNote { get; init; } = string.Empty;
     public string RawJson { get; init; } = string.Empty;
     public string ErrorText { get; init; } = string.Empty;
     public long RequestedAtTicks { get; init; } = -1;
@@ -1531,6 +1535,10 @@ public sealed class BattlefieldLlmDebugSnapshot
     public string UserPrompt { get; init; } = string.Empty;
     public string RawResponse { get; init; } = string.Empty;
     public string ParsedJson { get; init; } = string.Empty;
+    public string DebugText { get; init; } = string.Empty;
+    public string DebugScoreRead { get; init; } = string.Empty;
+    public string DebugPositionRead { get; init; } = string.Empty;
+    public string DebugLatencyNote { get; init; } = string.Empty;
     public string ErrorText { get; init; } = string.Empty;
     public long RequestedAtTicks { get; init; } = -1;
     public long ReceivedAtTicks { get; init; } = -1;

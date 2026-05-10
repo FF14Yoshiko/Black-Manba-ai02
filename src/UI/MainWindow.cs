@@ -898,6 +898,10 @@ public class MainWindow : Window, IDisposable
         DrawReadonlyTextPanel("用户提示词", debug.UserPrompt, "LlmUserPrompt", 220f);
         DrawReadonlyTextPanel("模型原始响应", debug.RawResponse, "LlmRawResponse", 150f);
         DrawReadonlyTextPanel("解析结果 JSON", debug.ParsedJson, "LlmParsedJson", 150f);
+        DrawReadonlyTextPanel("模型调试摘要", debug.DebugText, "LlmDebugText", 120f);
+        DrawReadonlyTextPanel("比分读取", debug.DebugScoreRead, "LlmDebugScoreRead", 72f);
+        DrawReadonlyTextPanel("位置读取", debug.DebugPositionRead, "LlmDebugPositionRead", 72f);
+        DrawReadonlyTextPanel("延迟说明", debug.DebugLatencyNote, "LlmDebugLatencyNote", 72f);
         DrawReadonlyTextPanel("最近上下文", BuildLlmConversationDebugText(debug.ConversationTurns), "LlmConversationContext", 220f);
     }
 
@@ -2760,8 +2764,8 @@ public class MainWindow : Window, IDisposable
             changed |= DrawInputText("API Key 环境变量", llmDecision.ApiKeyEnvironmentVariable, 80, value => llmDecision.ApiKeyEnvironmentVariable = value);
             changed |= DrawInputText("API Key（可留空，优先用环境变量）", llmDecision.ApiKey, 220, value => llmDecision.ApiKey = value);
             changed |= DrawSliderInt("请求超时（毫秒）", llmDecision.RequestTimeoutMs, 1500, 15000, value => llmDecision.RequestTimeoutMs = value);
-            changed |= DrawSliderInt("最小请求间隔（秒）", llmDecision.MinIntervalSeconds, 5, 120, value => llmDecision.MinIntervalSeconds = value);
-            changed |= DrawSliderInt("同局势冷却（秒）", llmDecision.SameSituationCooldownSeconds, 8, 180, value => llmDecision.SameSituationCooldownSeconds = value);
+            changed |= DrawSliderInt("最小请求间隔（秒）", llmDecision.MinIntervalSeconds, 3, 120, value => llmDecision.MinIntervalSeconds = value);
+            changed |= DrawSliderInt("同局势冷却（秒）", llmDecision.SameSituationCooldownSeconds, 5, 180, value => llmDecision.SameSituationCooldownSeconds = value);
             changed |= DrawSliderInt("AI 决策新鲜期（秒）", llmDecision.FreshDecisionSeconds, 10, 180, value => llmDecision.FreshDecisionSeconds = value);
             changed |= DrawSliderInt("上下文保留条数", llmDecision.MaxContextTurns, 0, 12, value => llmDecision.MaxContextTurns = value);
             changed |= DrawToggle("请求中包含调试摘要", llmDecision.IncludeDebugPayload, value => llmDecision.IncludeDebugPayload = value);

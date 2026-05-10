@@ -319,6 +319,10 @@ public class LlmDecisionConfiguration
     private const int PreviousDefaultMinIntervalSeconds = 10;
     private const int PreviousDefaultSameSituationCooldownSeconds = 15;
     private const int PreviousDefaultFreshDecisionSeconds = 55;
+    private const int RelaxedDefaultMinIntervalSeconds = 8;
+    private const int RelaxedDefaultSameSituationCooldownSeconds = 14;
+    private const int LegacyHighDefaultMinIntervalSeconds = 18;
+    private const int LegacyHighDefaultSameSituationCooldownSeconds = 36;
 
     public bool Enabled { get; set; } = true;
     public string ProviderBaseUrl { get; set; } = "https://api.deepseek.com";
@@ -326,8 +330,8 @@ public class LlmDecisionConfiguration
     public string ApiKeyEnvironmentVariable { get; set; } = "DEEPSEEK_API_KEY";
     public string ApiKey { get; set; } = string.Empty;
     public int RequestTimeoutMs { get; set; } = 4500;
-    public int MinIntervalSeconds { get; set; } = 18;
-    public int SameSituationCooldownSeconds { get; set; } = 36;
+    public int MinIntervalSeconds { get; set; } = 5;
+    public int SameSituationCooldownSeconds { get; set; } = 8;
     public int FreshDecisionSeconds { get; set; } = 40;
     public int MaxContextTurns { get; set; } = 6;
     public bool IncludeDebugPayload { get; set; } = true;
@@ -342,15 +346,19 @@ public class LlmDecisionConfiguration
             ? "DEEPSEEK_API_KEY"
             : ApiKeyEnvironmentVariable.Trim();
         ApiKey = ApiKey?.Trim() ?? string.Empty;
-        if (MinIntervalSeconds == PreviousDefaultMinIntervalSeconds)
+        if (MinIntervalSeconds == PreviousDefaultMinIntervalSeconds
+            || MinIntervalSeconds == RelaxedDefaultMinIntervalSeconds
+            || MinIntervalSeconds == LegacyHighDefaultMinIntervalSeconds)
             MinIntervalSeconds = 5;
-        if (SameSituationCooldownSeconds == PreviousDefaultSameSituationCooldownSeconds)
+        if (SameSituationCooldownSeconds == PreviousDefaultSameSituationCooldownSeconds
+            || SameSituationCooldownSeconds == RelaxedDefaultSameSituationCooldownSeconds
+            || SameSituationCooldownSeconds == LegacyHighDefaultSameSituationCooldownSeconds)
             SameSituationCooldownSeconds = 8;
         if (FreshDecisionSeconds == PreviousDefaultFreshDecisionSeconds)
             FreshDecisionSeconds = 40;
         RequestTimeoutMs = Math.Clamp(RequestTimeoutMs, 1500, 15000);
-        MinIntervalSeconds = Math.Clamp(MinIntervalSeconds, 5, 120);
-        SameSituationCooldownSeconds = Math.Clamp(SameSituationCooldownSeconds, 8, 180);
+        MinIntervalSeconds = Math.Clamp(MinIntervalSeconds, 3, 120);
+        SameSituationCooldownSeconds = Math.Clamp(SameSituationCooldownSeconds, 5, 180);
         FreshDecisionSeconds = Math.Clamp(FreshDecisionSeconds, 10, 180);
         MaxContextTurns = Math.Clamp(MaxContextTurns, 0, 12);
     }

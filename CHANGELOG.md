@@ -2,6 +2,13 @@
 
 All notable changes to this plugin will be documented in this file.
 
+## 1.1.2 - 2026-05-11
+
+- Relaxed the LLM gate so in-match testing can trigger more often, with cleaner JSON payload output and richer debug fields.
+- Fixed manual AI probe prompts incorrectly sending a fake pre-match time state when live match time was temporarily unreadable.
+- Split battlefield refresh work across more frames and reduced same-frame sampling pressure to smooth out large-team combat stutter.
+- Kept local immediate combat handling intact while moving more strategic and debug work off the hot path.
+
 ## 1.1.0 - 2026-05-09
 
 - Split the main experience into a compact in-combat command HUD and a separate review/debug page.

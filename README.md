@@ -152,10 +152,30 @@ CI 会自动恢复 Dalamud 开发依赖、构建 Release 包，并校验 `latest
   - `latest.zip`
   - `latest.zip.sha256`
 
+- 当前 zip 直链：
+  - `https://github.com/FF14Yoshiko/Black-Manba-ai02/releases/latest/download/latest.zip`
+
+- 当前自定义仓库链：
+  - `https://raw.githubusercontent.com/FF14Yoshiko/Black-Manba-ai02/main/pluginmaster.json`
+
 发布方式也已经配好：
 
 - 推送标签（例如 `v1.1.1`）后，GitHub Actions 会自动构建并创建 Release
 - 也可以在 Actions 页手动运行 `Release Plugin` 工作流，指定标签名后发布
+
+## 安装到 Dalamud 自定义仓库
+
+1. 确保 GitHub 仓库已经是 **Public**
+2. 打开 Dalamud 插件安装器设置
+3. 添加自定义仓库地址：
+
+```text
+https://raw.githubusercontent.com/FF14Yoshiko/Black-Manba-ai02/main/pluginmaster.json
+```
+
+4. 刷新插件列表后搜索 `前线战术指挥`
+
+如果你只想手动下载，也可以直接打开 Release 页面取 `latest.zip`。
 
 ## Roadmap
 

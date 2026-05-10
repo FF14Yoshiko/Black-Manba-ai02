@@ -13,6 +13,16 @@ $expectedEntries = @(
     "WinRT.Runtime.dll"
 )
 
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$builtInGraphRoot = Join-Path $repoRoot "BuiltInTacticalGraphs"
+if (Test-Path -LiteralPath $builtInGraphRoot) {
+    $expectedEntries += Get-ChildItem -LiteralPath $builtInGraphRoot -Recurse -File |
+        ForEach-Object {
+            $relativePath = $_.FullName.Substring($builtInGraphRoot.Length).TrimStart('\', '/')
+            "BuiltInTacticalGraphs\$relativePath"
+        }
+}
+
 $resolvedPackage = Resolve-Path -LiteralPath $PackagePath
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
@@ -20,7 +30,8 @@ $zip = [System.IO.Compression.ZipFile]::OpenRead($resolvedPackage.Path)
 try {
     $entries = $zip.Entries |
         Where-Object { -not [string]::IsNullOrWhiteSpace($_.FullName) -and -not $_.FullName.EndsWith("/") } |
-        Select-Object -ExpandProperty FullName
+        Select-Object -ExpandProperty FullName |
+        ForEach-Object { $_ -replace '/', '\' }
 
     $missingEntries = $expectedEntries | Where-Object { $_ -notin $entries }
     $unexpectedEntries = $entries | Where-Object { $_ -notin $expectedEntries }

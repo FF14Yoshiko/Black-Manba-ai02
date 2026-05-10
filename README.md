@@ -1,7 +1,7 @@
 # 前线战术指挥
 
 <p align="center">
-  <img src="./images/github-cover.png" alt="前线战术指挥 GitHub 封面图" width="100%" />
+  <img src="./docs/assets/github-cover.png" alt="前线战术指挥 GitHub 封面图" width="100%" />
 </p>
 
 <p align="center">
@@ -65,25 +65,25 @@
 
 ## 模块一览
 
-- `Plugin.cs`  
+- `src/Core/Plugin.cs`  
   插件入口与服务装配
 
-- `WorldStateService.cs`  
+- `src/Decision/WorldStateService.cs`  
   战场采集、主循环、快照整合和节流调度
 
-- `TacticalDecisionEngineService.cs`  
+- `src/Decision/TacticalDecisionEngineService.cs`  
   本地即时指挥与战术评分
 
-- `LlmStrategicDecisionService.cs`  
+- `src/Decision/LlmStrategicDecisionService.cs`  
   AI 大决策门控、请求、JSON 解析和会话上下文
 
-- `MapTacticalGraphService.cs`  
+- `src/Map/MapTacticalGraphService.cs`  
   内置/自定义战术图谱加载、版本管理和图谱合成
 
-- `MapTacticalAnalysisService.cs`  
+- `src/Map/MapTacticalAnalysisService.cs`  
   图谱、动态目标与局势结合后的路径/区域分析
 
-- `BattlefieldReplayRecorder.cs`  
+- `src/Decision/BattlefieldReplayRecorder.cs`  
   回放记录、评估事件和调权反馈
 
 ## 仓库结构
@@ -92,13 +92,17 @@
 .
 ├─ .github/workflows/          GitHub Actions 构建流程
 ├─ BuiltInTacticalGraphs/      内置战术图谱 JSON
+├─ docs/                       仓库展示与补充文档
 ├─ images/                     README 与插件资源
 ├─ scripts/                    打包校验脚本
-├─ Plugin.cs                   插件入口
-├─ WorldStateService.cs        战场主循环
-├─ TacticalDecisionEngineService.cs
-├─ LlmStrategicDecisionService.cs
-├─ MapTacticalGraphService.cs
+├─ src/
+│  ├─ Core/                    插件入口与配置
+│  ├─ UI/                      主窗口、雷达、HUD、界面服务
+│  ├─ Frontline/               前线比分、公告、聊天、知识库
+│  ├─ Decision/                主状态机、LLM 决策、回放
+│  ├─ Map/                     战术图谱、标注、区域分析
+│  ├─ Combat/                  战斗事件、状态、标记、Hook
+│  └─ Models/                  战场快照与共享模型
 └─ ai02.csproj
 ```
 
@@ -172,7 +176,7 @@ CI 会自动恢复 Dalamud 开发依赖、构建 Release 包，并校验 `latest
   `ffxiv`, `dalamud`, `dalamud-plugin`, `xivlauncher`, `pvp`, `frontline`, `radar`, `tactical-decision`, `battlefield-analysis`, `deepseek`, `replay-analysis`, `plugin`
 
 - **Social Preview / Cover**  
-  使用仓库内的 `images/github-cover.png`
+  使用仓库内的 `docs/assets/github-cover.png`
 
 ## 免责声明
 

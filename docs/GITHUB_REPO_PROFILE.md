@@ -23,11 +23,10 @@ plugin
 
 ## Social Preview
 
-- 推荐文件：`images/github-cover.png`
+- 推荐文件：`docs/assets/github-cover.png`
 - 用途：GitHub 仓库首页分享封面 / README 顶部展示图
 
 ## About 区建议勾选
 
 - Releases
 - Packages（如果以后需要）
-

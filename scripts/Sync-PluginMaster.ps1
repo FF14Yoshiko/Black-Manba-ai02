@@ -21,11 +21,11 @@ $ErrorActionPreference = "Stop"
 $resolvedManifest = Resolve-Path -LiteralPath $ManifestPath
 $resolvedPluginMaster = Resolve-Path -LiteralPath $PluginMasterPath
 
-$manifest = Get-Content -LiteralPath $resolvedManifest.Path -Encoding UTF8 | ConvertFrom-Json
-$pluginMaster = Get-Content -LiteralPath $resolvedPluginMaster.Path -Encoding UTF8 | ConvertFrom-Json
+$manifest = Get-Content -LiteralPath $resolvedManifest.Path -Raw -Encoding UTF8 | ConvertFrom-Json
+$pluginMaster = Get-Content -LiteralPath $resolvedPluginMaster.Path -Raw -Encoding UTF8 | ConvertFrom-Json
 
-if ($pluginMaster -isnot [System.Collections.IEnumerable]) {
-    throw "pluginmaster.json must be an array."
+if ($null -eq $pluginMaster) {
+    throw "pluginmaster.json is empty."
 }
 
 $entries = @($pluginMaster)

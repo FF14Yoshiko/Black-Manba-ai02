@@ -30,6 +30,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -81,6 +83,41 @@ jobs:
           "tag=$tag" >> $env:GITHUB_OUTPUT
           "name=$name" >> $env:GITHUB_OUTPUT
           "prerelease=$prerelease" >> $env:GITHUB_OUTPUT
+
+      - name: Capture release manifest
+        shell: pwsh
+        run: |
+          Copy-Item -LiteralPath "ai02.json" -Destination (Join-Path $env:RUNNER_TEMP "release-ai02.json") -Force
+
+      - name: Sync plugin repository manifest
+        shell: pwsh
+        run: |
+          $defaultBranch = "${{ github.event.repository.default_branch }}"
+          $repoUrl = "https://github.com/${{ github.repository }}"
+          $iconUrl = "https://raw.githubusercontent.com/${{ github.repository }}/$defaultBranch/images/icon.png"
+          $imageUrl = "https://raw.githubusercontent.com/${{ github.repository }}/$defaultBranch/docs/assets/github-cover.png"
+          $tag = "${{ steps.release_meta.outputs.tag }}"
+
+          git fetch origin $defaultBranch
+          git switch -C $defaultBranch "origin/$defaultBranch"
+
+          ./scripts/Sync-PluginMaster.ps1 `
+            -ManifestPath (Join-Path $env:RUNNER_TEMP "release-ai02.json") `
+            -PluginMasterPath "pluginmaster.json" `
+            -RepoUrl $repoUrl `
+            -IconUrl $iconUrl `
+            -ImageUrls $imageUrl
+
+          if (git diff --quiet -- pluginmaster.json) {
+            Write-Host "pluginmaster.json 无需更新。"
+            exit 0
+          }
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pluginmaster.json
+          git commit -m "Update pluginmaster for $tag"
+          git push origin HEAD:$defaultBranch
 
       - name: Create GitHub release and upload assets
         uses: softprops/action-gh-release@v3

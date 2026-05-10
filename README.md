@@ -161,6 +161,7 @@ CI 会自动恢复 Dalamud 开发依赖、构建 Release 包，并校验 `latest
 发布方式也已经配好：
 
 - 推送标签（例如 `v1.1.1`）后，GitHub Actions 会自动构建并创建 Release
+- Release 工作流会同步更新 `pluginmaster.json` 中的版本号、API 等级和更新时间
 - 也可以在 Actions 页手动运行 `Release Plugin` 工作流，指定标签名后发布
 
 ## 安装到 Dalamud 自定义仓库

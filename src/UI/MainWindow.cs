@@ -868,6 +868,39 @@ public class MainWindow : Window, IDisposable
             DrawHint($"原始JSON：{llm.RawJson}");
     }
 
+    private static void DrawLlmDebugSnapshot(BattlefieldLlmStrategicDecisionSnapshot llm, BattlefieldLlmDebugSnapshot debug)
+    {
+        ImGui.TextColored(LlmDecisionColor(llm), debug.StatusText);
+        ImGui.Text($"当前会话：{(string.IsNullOrWhiteSpace(debug.SessionId) ? "未建立" : debug.SessionId)}");
+        ImGui.Text($"请求状态：{BuildLlmDebugStatusText(debug)}");
+        if (!string.IsNullOrWhiteSpace(debug.CurrentGateReason))
+            DrawHint($"当前门控：{debug.CurrentNeedText}；{debug.CurrentGateReason}");
+
+        if (!debug.HasRequest)
+        {
+            DrawHint("本局还没有发出 AI 请求。可以先点“忽略门控立即请求”或“发送测试对话”。");
+        }
+        else
+        {
+            if (!string.IsNullOrWhiteSpace(debug.LastRequestGateReason))
+                DrawHint($"最近请求触发：{debug.LastRequestNeedText}；{debug.LastRequestGateReason}");
+            if (!string.IsNullOrWhiteSpace(debug.LastRequestSituationKey))
+                DrawHint($"场景键：{debug.LastRequestSituationKey}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(debug.ErrorText))
+            DrawHint($"最近错误：{debug.ErrorText}");
+        if (!string.IsNullOrWhiteSpace(llm.RecommendedAction) || !string.IsNullOrWhiteSpace(llm.ShortReason))
+            DrawHint($"最近决策：{llm.RecommendedAction}；{llm.ShortReason}");
+
+        DrawReadonlyTextPanel("手动附言", debug.ManualInstruction, "LlmManualInstruction", 72f);
+        DrawReadonlyTextPanel("系统提示词", debug.SystemPrompt, "LlmSystemPrompt", 150f);
+        DrawReadonlyTextPanel("用户提示词", debug.UserPrompt, "LlmUserPrompt", 220f);
+        DrawReadonlyTextPanel("模型原始响应", debug.RawResponse, "LlmRawResponse", 150f);
+        DrawReadonlyTextPanel("解析结果 JSON", debug.ParsedJson, "LlmParsedJson", 150f);
+        DrawReadonlyTextPanel("最近上下文", BuildLlmConversationDebugText(debug.ConversationTurns), "LlmConversationContext", 220f);
+    }
+
     private static void DrawDualPriorityTargets(BattlefieldDecisionSnapshot decision)
     {
         if (!decision.ObjectivePriorityTarget.HasValue && !decision.FightPriorityTarget.HasValue)
@@ -2756,6 +2789,14 @@ public class MainWindow : Window, IDisposable
             if (!string.IsNullOrWhiteSpace(llmManualStatus))
                 DrawHint($"测试通道：{llmManualStatus}");
             DrawHint("当前默认门控已放宽，方便联调 AI 延迟与 JSON 稳定性；本地状态机会继续吃掉即时战斗和紧急撤退，AI 仍只看大决策。");
+
+            if (BeginCollapsibleSection("AI 对话调试", "局内直接查看提示词、原始回复、解析 JSON 和会话上下文", true))
+            {
+                var debug = plugin.LlmStrategicDecisionService.GetDebugSnapshot(snapshot);
+                DrawLlmDebugSnapshot(ai, debug);
+                EndCollapsibleSection();
+            }
+
             EndCollapsibleSection();
         }
 
@@ -3148,6 +3189,69 @@ public class MainWindow : Window, IDisposable
 
         setValue(Encoding.UTF8.GetString(buffer, 0, zeroIndex).Trim());
         return true;
+    }
+
+    private static void DrawReadonlyTextPanel(string label, string text, string id, float height)
+    {
+        var value = text ?? string.Empty;
+        ImGui.AlignTextToFramePadding();
+        ImGui.Text(label);
+        ImGui.SameLine();
+        if (ImGui.SmallButton($"复制##{id}"))
+            ImGui.SetClipboardText(value);
+        ImGui.SameLine();
+        ImGui.TextDisabled($"{value.Length} 字");
+
+        if (ImGui.BeginChild($"##{id}", new Vector2(0f, height), true, ImGuiWindowFlags.HorizontalScrollbar))
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                ImGui.TextDisabled("暂无内容");
+            else
+                ImGui.TextUnformatted(value);
+        }
+
+        ImGui.EndChild();
+    }
+
+    private static string BuildLlmDebugStatusText(BattlefieldLlmDebugSnapshot debug)
+    {
+        if (!debug.HasRequest)
+            return "本局尚未发起 AI 请求";
+        if (debug.IsPending)
+            return "请求已发出，等待模型回复";
+        if (debug.ReceivedAtTicks >= 0)
+            return debug.AgeSeconds >= 0 ? $"最近一次回复距今 {debug.AgeSeconds} 秒" : "最近一次请求已收到回复";
+        return "最近一次请求未返回有效回复";
+    }
+
+    private static string BuildLlmConversationDebugText(IReadOnlyList<BattlefieldLlmConversationTurnSnapshot> turns)
+    {
+        if (turns.Count == 0)
+            return string.Empty;
+
+        var builder = new StringBuilder();
+        for (var i = 0; i < turns.Count; i++)
+        {
+            var turn = turns[i];
+            if (builder.Length > 0)
+                builder.AppendLine().AppendLine();
+
+            builder.Append("[").Append(i + 1).Append("] ");
+            if (turn.MatchRemainingSeconds >= 0)
+                builder.Append("剩余 ").Append(turn.MatchRemainingSeconds).Append(" 秒 | ");
+            builder.Append(turn.NeedText);
+            builder.Append(" | 置信 ").Append(turn.Confidence.ToString("0"));
+            builder.AppendLine();
+            if (!string.IsNullOrWhiteSpace(turn.OperatorNote))
+                builder.Append("附言：").AppendLine(turn.OperatorNote);
+            builder.Append("决策：").AppendLine(turn.Decision);
+            if (!string.IsNullOrWhiteSpace(turn.ShortReason))
+                builder.Append("理由：").AppendLine(turn.ShortReason);
+            if (!string.IsNullOrWhiteSpace(turn.SituationKey))
+                builder.Append("场景键：").Append(turn.SituationKey);
+        }
+
+        return builder.ToString();
     }
 
     private static bool DrawSliderFloat(string label, float currentValue, float min, float max, Action<float> setValue)

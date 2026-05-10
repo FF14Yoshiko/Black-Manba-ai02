@@ -1503,6 +1503,41 @@ public sealed class BattlefieldLlmStrategicDecisionSnapshot
     public string StatusText { get; init; } = "AI 大决策尚未运行";
 }
 
+public readonly record struct BattlefieldLlmConversationTurnSnapshot(
+    long Ticks,
+    int MatchRemainingSeconds,
+    string NeedText,
+    string OperatorNote,
+    string Decision,
+    string ShortReason,
+    float Confidence,
+    string SituationKey);
+
+public sealed class BattlefieldLlmDebugSnapshot
+{
+    public bool IsEnabled { get; init; }
+    public bool IsConfigured { get; init; }
+    public bool IsPending { get; init; }
+    public bool HasRequest { get; init; }
+    public string StatusText { get; init; } = string.Empty;
+    public string SessionId { get; init; } = string.Empty;
+    public string CurrentNeedText { get; init; } = string.Empty;
+    public string CurrentGateReason { get; init; } = string.Empty;
+    public string LastRequestNeedText { get; init; } = string.Empty;
+    public string LastRequestGateReason { get; init; } = string.Empty;
+    public string LastRequestSituationKey { get; init; } = string.Empty;
+    public string ManualInstruction { get; init; } = string.Empty;
+    public string SystemPrompt { get; init; } = string.Empty;
+    public string UserPrompt { get; init; } = string.Empty;
+    public string RawResponse { get; init; } = string.Empty;
+    public string ParsedJson { get; init; } = string.Empty;
+    public string ErrorText { get; init; } = string.Empty;
+    public long RequestedAtTicks { get; init; } = -1;
+    public long ReceivedAtTicks { get; init; } = -1;
+    public int AgeSeconds { get; init; } = -1;
+    public BattlefieldLlmConversationTurnSnapshot[] ConversationTurns { get; init; } = Array.Empty<BattlefieldLlmConversationTurnSnapshot>();
+}
+
 public sealed class BattlefieldDecisionSnapshot
 {
     public bool IsAvailable { get; init; }

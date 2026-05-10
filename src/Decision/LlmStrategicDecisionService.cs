@@ -54,6 +54,13 @@ public sealed class LlmStrategicDecisionService : IDisposable
     private long lastRequestTicks = -1;
     private string lastRequestSituationKey = string.Empty;
     private string lastErrorText = string.Empty;
+    private LlmGateResult lastRequestGate = LlmGateResult.None("尚未发起 AI 请求");
+    private string lastManualInstruction = string.Empty;
+    private string lastSystemPrompt = string.Empty;
+    private string lastUserPrompt = string.Empty;
+    private string lastRawResponse = string.Empty;
+    private string lastParsedJson = string.Empty;
+    private long lastResponseTicks = -1;
     private bool disposed;
 
     public LlmStrategicDecisionService(Configuration configuration, IPluginLog log)
@@ -102,6 +109,89 @@ public sealed class LlmStrategicDecisionService : IDisposable
 
         EnsureSession(snapshot, now);
         return BuildRuntimeSnapshot(now, true, config);
+    }
+
+    public BattlefieldLlmDebugSnapshot GetDebugSnapshot(BattlefieldSnapshot snapshot)
+    {
+        var now = Environment.TickCount64;
+        var config = configuration.LlmDecision ?? new LlmDecisionConfiguration();
+        config.Normalize();
+
+        BattlefieldLlmStrategicDecisionSnapshot runtime;
+        if (!snapshot.IsInFrontline)
+        {
+            ResetSession("离开纷争前线");
+            runtime = BuildRuntimeSnapshot(now, false, config);
+        }
+        else
+        {
+            EnsureSession(snapshot, now);
+            runtime = BuildRuntimeSnapshot(now, true, config);
+        }
+
+        LlmGateResult requestGate;
+        string manualInstruction;
+        string systemPrompt;
+        string userPrompt;
+        string rawResponse;
+        string parsedJson;
+        long responseTicks;
+        LlmConversationTurn[] turns;
+        lock (sync)
+        {
+            requestGate = lastRequestGate;
+            manualInstruction = lastManualInstruction;
+            systemPrompt = lastSystemPrompt;
+            userPrompt = lastUserPrompt;
+            rawResponse = lastRawResponse;
+            parsedJson = lastParsedJson;
+            responseTicks = lastResponseTicks;
+            turns = conversation.ToArray();
+        }
+
+        var hasRequest = runtime.RequestedAtTicks >= 0
+            || !string.IsNullOrWhiteSpace(systemPrompt)
+            || !string.IsNullOrWhiteSpace(userPrompt)
+            || !string.IsNullOrWhiteSpace(rawResponse);
+        var ageSeconds = responseTicks >= 0
+            ? Math.Max(0, (int)((now - responseTicks) / 1000L))
+            : runtime.AgeSeconds;
+
+        return new BattlefieldLlmDebugSnapshot
+        {
+            IsEnabled = runtime.IsEnabled,
+            IsConfigured = runtime.IsConfigured,
+            IsPending = runtime.IsPending,
+            HasRequest = hasRequest,
+            StatusText = runtime.StatusText,
+            SessionId = runtime.SessionId,
+            CurrentNeedText = runtime.NeedText,
+            CurrentGateReason = runtime.GateReason,
+            LastRequestNeedText = hasRequest ? NeedKindText(requestGate.NeedKind) : string.Empty,
+            LastRequestGateReason = hasRequest ? requestGate.Reason : string.Empty,
+            LastRequestSituationKey = hasRequest ? requestGate.SituationKey : string.Empty,
+            ManualInstruction = manualInstruction,
+            SystemPrompt = systemPrompt,
+            UserPrompt = userPrompt,
+            RawResponse = rawResponse,
+            ParsedJson = parsedJson,
+            ErrorText = runtime.ErrorText,
+            RequestedAtTicks = runtime.RequestedAtTicks,
+            ReceivedAtTicks = responseTicks >= 0 ? responseTicks : runtime.ReceivedAtTicks,
+            AgeSeconds = ageSeconds,
+            ConversationTurns = turns
+                .Reverse()
+                .Select(turn => new BattlefieldLlmConversationTurnSnapshot(
+                    turn.Ticks,
+                    turn.MatchRemainingSeconds,
+                    NeedKindText(turn.NeedKind),
+                    turn.OperatorNote,
+                    turn.Decision,
+                    turn.ShortReason,
+                    turn.Confidence,
+                    turn.SituationKey))
+                .ToArray()
+        };
     }
 
     public string RequestManualProbe(BattlefieldSnapshot snapshot, string operatorNote, bool requireOperatorNote)
@@ -182,6 +272,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
                 lastErrorText = string.Empty;
                 lastRequestTicks = -1;
                 lastRequestSituationKey = string.Empty;
+                ClearDebugArtifacts();
                 requestCancellation?.Cancel();
                 requestTask = null;
             }
@@ -204,6 +295,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
             lastErrorText = string.Empty;
             lastRequestTicks = -1;
             lastRequestSituationKey = string.Empty;
+            ClearDebugArtifacts();
             requestCancellation?.Cancel();
             requestTask = null;
         }
@@ -515,6 +607,13 @@ public sealed class LlmStrategicDecisionService : IDisposable
             requestCancellation?.Dispose();
             requestCancellation = new CancellationTokenSource();
             var requestContext = BuildRequestContext(snapshot, gate, config, apiKey, now, manualInstruction);
+            lastRequestGate = gate;
+            lastManualInstruction = requestContext.ManualInstruction;
+            lastSystemPrompt = requestContext.SystemPrompt;
+            lastUserPrompt = requestContext.UserPrompt;
+            lastRawResponse = string.Empty;
+            lastParsedJson = string.Empty;
+            lastResponseTicks = -1;
             requestTask = Task.Run(() => ExecuteRequestAsync(requestContext, requestCancellation.Token));
             return true;
         }
@@ -555,8 +654,19 @@ public sealed class LlmStrategicDecisionService : IDisposable
         {
             using var timeout = new CancellationTokenSource(context.TimeoutMs);
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
-            var responseJson = await SendChatCompletionAsync(context, linked.Token).ConfigureAwait(false);
-            var decision = ParseDecisionResponse(responseJson, context);
+            var rawResponse = await SendChatCompletionAsync(context, linked.Token).ConfigureAwait(false);
+            var receivedAtTicks = Environment.TickCount64;
+            lock (sync)
+            {
+                if (!string.Equals(context.SessionId, currentSessionId, StringComparison.Ordinal))
+                    return;
+
+                lastRawResponse = rawResponse;
+                lastResponseTicks = receivedAtTicks;
+            }
+
+            var parsedJson = ExtractJsonObject(rawResponse);
+            var decision = ParseDecisionResponse(parsedJson, context, receivedAtTicks);
             lock (sync)
             {
                 if (!string.Equals(context.SessionId, currentSessionId, StringComparison.Ordinal))
@@ -564,6 +674,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
 
                 lastDecision = decision;
                 lastErrorText = string.Empty;
+                lastParsedJson = parsedJson;
                 conversation.Enqueue(new LlmConversationTurn(
                     decision.ReceivedAtTicks,
                     lastMatchTimeRemaining,
@@ -643,10 +754,9 @@ public sealed class LlmStrategicDecisionService : IDisposable
         return content;
     }
 
-    private BattlefieldLlmStrategicDecisionSnapshot ParseDecisionResponse(string responseJson, LlmRequestContext context)
+    private BattlefieldLlmStrategicDecisionSnapshot ParseDecisionResponse(string responseJson, LlmRequestContext context, long receivedAtTicks)
     {
-        var rawJson = ExtractJsonObject(responseJson);
-        using var document = JsonDocument.Parse(rawJson);
+        using var document = JsonDocument.Parse(responseJson);
         var root = document.RootElement;
         var decisionText = GetString(root, "decision", "决策", "decision_body");
         var shortReason = GetString(root, "short_reason", "shortReason", "reason", "简短理由");
@@ -655,7 +765,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
         var confidence = GetFloat(root, 72f, "confidence", "置信度");
         var risk = GetFloat(root, 50f, "risk", "风险");
         var debugText = GetDebugText(root);
-        var now = Environment.TickCount64;
+        var now = receivedAtTicks >= 0 ? receivedAtTicks : Environment.TickCount64;
 
         if (string.IsNullOrWhiteSpace(decisionText))
             decisionText = string.IsNullOrWhiteSpace(recommendedAction) ? "保持本地决策，等待下一帧" : recommendedAction;
@@ -680,7 +790,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
             Confidence = Math.Clamp(confidence, 0f, 100f),
             Risk = Math.Clamp(risk, 0f, 100f),
             DebugText = Truncate(debugText, 600),
-            RawJson = Truncate(rawJson, 1200),
+            RawJson = Truncate(responseJson, 1200),
             RequestedAtTicks = context.RequestedAtTicks,
             ReceivedAtTicks = now,
             AgeSeconds = 0,
@@ -1328,6 +1438,17 @@ public sealed class LlmStrategicDecisionService : IDisposable
             return string.Empty;
         text = text.Trim();
         return text.Length <= maxChars ? text : text[..Math.Max(0, maxChars - 1)] + "…";
+    }
+
+    private void ClearDebugArtifacts()
+    {
+        lastRequestGate = LlmGateResult.None("尚未发起 AI 请求");
+        lastManualInstruction = string.Empty;
+        lastSystemPrompt = string.Empty;
+        lastUserPrompt = string.Empty;
+        lastRawResponse = string.Empty;
+        lastParsedJson = string.Empty;
+        lastResponseTicks = -1;
     }
 
     private readonly record struct LlmGateResult(

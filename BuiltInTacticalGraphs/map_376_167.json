@@ -1,0 +1,1735 @@
+{
+  "SchemaVersion": 2,
+  "GraphVersionId": "20260510_172410_707",
+  "TerritoryType": 376,
+  "MapId": 167,
+  "MapName": "\u5468\u8FB9\u9057\u8FF9\u7FA4\uFF08\u9635\u5730\u6218\uFF09",
+  "CreatedAtUnixMs": 1778433850707,
+  "UpdatedAtUnixMs": 1778433850707,
+  "SourceMapId": 167,
+  "SourceMapSizeScale": 1,
+  "SourceMapOffsetX": 0,
+  "SourceMapOffsetY": 0,
+  "Points": [
+    {
+      "Id": "a2dd9e06a7a1421ca8b6e4bbc6bb45c0",
+      "Kind": 0,
+      "Label": "\u5317\u51FA\u751F\u70B9",
+      "RouteId": "",
+      "X": -0.78674316,
+      "Y": 0,
+      "Z": -289.8145,
+      "Radius": 18,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778243046636
+    },
+    {
+      "Id": "6fab91889622486abdb536b76efb0016",
+      "Kind": 0,
+      "Label": "\u897F\u5357\u51FA\u751F\u70B9",
+      "RouteId": "",
+      "X": -258.92657,
+      "Y": 0,
+      "Z": 150.4574,
+      "Radius": 18,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778243060053
+    },
+    {
+      "Id": "89c31afac5ef48cb8f489566c608681c",
+      "Kind": 0,
+      "Label": "\u4E1C\u5357\u51FA\u751F\u70B9",
+      "RouteId": "",
+      "X": 255.91907,
+      "Y": 0,
+      "Z": 149.02332,
+      "Radius": 18,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778243069695
+    },
+    {
+      "Id": "45e6a8be23c0441687dd78690613ede4",
+      "Kind": 0,
+      "Label": "\u5317\u51FA\u751F\u70B9",
+      "RouteId": "",
+      "X": -0.7090454,
+      "Y": 0,
+      "Z": -291.91315,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433208938
+    },
+    {
+      "Id": "ccac3a50d4f44c7e91403dd7158e0ea9",
+      "Kind": 0,
+      "Label": "\u897F\u5357\u51FA\u751F\u70B9",
+      "RouteId": "",
+      "X": -255.7218,
+      "Y": 0,
+      "Z": 148.47058,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433215591
+    },
+    {
+      "Id": "7a7a370ce6364565a226546471eb6958",
+      "Kind": 0,
+      "Label": "\u4E1C\u5357\u51FA\u751F\u70B9",
+      "RouteId": "",
+      "X": 260.44885,
+      "Y": 0,
+      "Z": 151.54309,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433221025
+    },
+    {
+      "Id": "b791f3e0a2a54695905423aa88cb48fb",
+      "Kind": 1,
+      "Label": "\u636E\u70B9",
+      "RouteId": "",
+      "X": -51.505005,
+      "Y": 0,
+      "Z": 187.16309,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433288257
+    },
+    {
+      "Id": "9793b3af81a64774b7cf61c638e11818",
+      "Kind": 1,
+      "Label": "\u636E\u70B9",
+      "RouteId": "",
+      "X": 49.17395,
+      "Y": 0,
+      "Z": 185.42725,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433291117
+    },
+    {
+      "Id": "f3fb1d3770f04838aae783b81d9d13e8",
+      "Kind": 1,
+      "Label": "\u636E\u70B9",
+      "RouteId": "",
+      "X": 178.49438,
+      "Y": 0,
+      "Z": -50.647583,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433296106
+    },
+    {
+      "Id": "55b2d9f407b94488a474088370e8a789",
+      "Kind": 1,
+      "Label": "\u636E\u70B9",
+      "RouteId": "",
+      "X": 132.4945,
+      "Y": 0,
+      "Z": -124.42096,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433297534
+    },
+    {
+      "Id": "1ef9d9feb8544dca85605ca66ba1dac6",
+      "Kind": 1,
+      "Label": "\u636E\u70B9",
+      "RouteId": "",
+      "X": -135.69324,
+      "Y": 0,
+      "Z": -127.024536,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433299899
+    },
+    {
+      "Id": "da7d9ba70e6f479d98fe083b90f4b62c",
+      "Kind": 1,
+      "Label": "\u636E\u70B9",
+      "RouteId": "",
+      "X": -183.42896,
+      "Y": 0,
+      "Z": -45.43982,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433302211
+    },
+    {
+      "Id": "bb3417301c9b4878aafd3857423ab611",
+      "Kind": 1,
+      "Label": "\u636E\u70B9",
+      "RouteId": "",
+      "X": -127.10071,
+      "Y": 0,
+      "Z": 71.78174,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433310239
+    },
+    {
+      "Id": "f4ca3399a07a42cbb87e95a0d399bc1c",
+      "Kind": 1,
+      "Label": "\u636E\u70B9",
+      "RouteId": "",
+      "X": 132.40808,
+      "Y": 0,
+      "Z": 75.25342,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433312026
+    },
+    {
+      "Id": "2f9e42a820984d55b9606b56bc54ea4c",
+      "Kind": 1,
+      "Label": "\u636E\u70B9",
+      "RouteId": "",
+      "X": -3.855774,
+      "Y": 0,
+      "Z": -142.59497,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433315002
+    },
+    {
+      "Id": "45f7c459e6884b4e81a99a4622788d24",
+      "Kind": 1,
+      "Label": "\u622A\u51FB\u65E0\u4EBA\u673A",
+      "RouteId": "",
+      "X": -2.119934,
+      "Y": 0,
+      "Z": -21.606934,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433343474
+    },
+    {
+      "Id": "4a114a2cd4be4ebea42faef1b5aebee7",
+      "Kind": 1,
+      "Label": "\u622A\u51FB\u65E0\u4EBA\u673A",
+      "RouteId": "",
+      "X": -2.119934,
+      "Y": 0,
+      "Z": 20.053345,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433345290
+    },
+    {
+      "Id": "0f27437614114e56ae0535103f444b0c",
+      "Kind": 1,
+      "Label": "\u622A\u51FB\u65E0\u4EBA\u673A",
+      "RouteId": "",
+      "X": -21.214172,
+      "Y": 0,
+      "Z": -12.059814,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433347499
+    },
+    {
+      "Id": "4fed7cd3dc314e378fe7052d6bfb9f0c",
+      "Kind": 1,
+      "Label": "\u622A\u51FB\u65E0\u4EBA\u673A",
+      "RouteId": "",
+      "X": -21.214172,
+      "Y": 0,
+      "Z": 11.3741455,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433348436
+    },
+    {
+      "Id": "ff726bf771114fc381e90107d9d6961d",
+      "Kind": 1,
+      "Label": "\u622A\u51FB\u65E0\u4EBA\u673A",
+      "RouteId": "",
+      "X": 20.446045,
+      "Y": 0,
+      "Z": -10.323975,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433349378
+    },
+    {
+      "Id": "f0d7acfb6d454b819e16e14c128dc21c",
+      "Kind": 1,
+      "Label": "\u622A\u51FB\u65E0\u4EBA\u673A",
+      "RouteId": "",
+      "X": 19.578125,
+      "Y": 0,
+      "Z": 10.506226,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433350979
+    },
+    {
+      "Id": "975d481ca47642eda4afe859cd592a18",
+      "Kind": 1,
+      "Label": "\u622A\u51FB\u7CFB\u7EDF",
+      "RouteId": "",
+      "X": -1.2519531,
+      "Y": 0,
+      "Z": 0.9589844,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433365622
+    },
+    {
+      "Id": "2e4a3719955e46dcb8bfe64d5803a92e",
+      "Kind": 4,
+      "Label": "\u4F20\u9001\u88C5\u7F6E\u5165\u53E31",
+      "RouteId": "",
+      "X": -178.29236,
+      "Y": 0,
+      "Z": -102.13568,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433428114
+    },
+    {
+      "Id": "b303f8b7dfd84734b3713175d7811eee",
+      "Kind": 4,
+      "Label": "\u4F20\u9001\u88C5\u7F6E\u5165\u53E32",
+      "RouteId": "",
+      "X": 174.01465,
+      "Y": 0,
+      "Z": -93.942505,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433435283
+    },
+    {
+      "Id": "14ff4721c2e74ae7953595f8c3b7940e",
+      "Kind": 4,
+      "Label": "\u4F20\u9001\u88C5\u7F6E\u5165\u53E33",
+      "RouteId": "",
+      "X": -2.138733,
+      "Y": 0,
+      "Z": 206.13318,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433440496
+    },
+    {
+      "Id": "498d9f92b53148d7a46254081a2a847e",
+      "Kind": 4,
+      "Label": "\u4F20\u9001\u88C5\u7F6E\u51FA\u53E33",
+      "RouteId": "",
+      "X": -1.114502,
+      "Y": 0,
+      "Z": 63.77661,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433448365
+    },
+    {
+      "Id": "96b9145213ad499fbe426e1d6e492187",
+      "Kind": 4,
+      "Label": "\u4F20\u9001\u88C5\u7F6E\u51FA\u53E32",
+      "RouteId": "",
+      "X": 55.213623,
+      "Y": 0,
+      "Z": -33.517395,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433454435
+    },
+    {
+      "Id": "e08816f66a46488b9ffac466487e243d",
+      "Kind": 4,
+      "Label": "\u4F20\u9001\u88C5\u7F6E\u51FA\u53E31",
+      "RouteId": "",
+      "X": -54.37018,
+      "Y": 0,
+      "Z": -32.493286,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433460093
+    },
+    {
+      "Id": "f9ed916dec3a4e37890a01014640d6b6",
+      "Kind": 12,
+      "Label": "\u5F88\u9AD8\u7684\u68651",
+      "RouteId": "\u5F88\u9AD8\u7684\u68651",
+      "X": -0.09033203,
+      "Y": 0,
+      "Z": -72.43506,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433473441
+    },
+    {
+      "Id": "af0b7b487a064cb8bee833af251fa31f",
+      "Kind": 12,
+      "Label": "\u5F88\u9AD8\u7684\u68651",
+      "RouteId": "\u5F88\u9AD8\u7684\u68651",
+      "X": -1.114502,
+      "Y": 0,
+      "Z": -83.70068,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433474212
+    },
+    {
+      "Id": "a3539142ea0c4a3ab9011d0a459ee760",
+      "Kind": 12,
+      "Label": "\u5F88\u9AD8\u7684\u68652",
+      "RouteId": "\u5F88\u9AD8\u7684\u68652",
+      "X": 61.35852,
+      "Y": 0,
+      "Z": 35.100464,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433479959
+    },
+    {
+      "Id": "befac1f459394f1db66b9d90e1773272",
+      "Kind": 12,
+      "Label": "\u5F88\u9AD8\u7684\u68652",
+      "RouteId": "\u5F88\u9AD8\u7684\u68652",
+      "X": 71.6001,
+      "Y": 0,
+      "Z": 41.24536,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433480584
+    },
+    {
+      "Id": "efd97cc9574f41acbe08f5e390dd3ab3",
+      "Kind": 12,
+      "Label": "\u5F88\u9AD8\u7684\u68653",
+      "RouteId": "\u5F88\u9AD8\u7684\u68653",
+      "X": -59.49109,
+      "Y": 0,
+      "Z": 36.12451,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433491072
+    },
+    {
+      "Id": "7601bfdbfffe4e2c8e5f9d78038bf4da",
+      "Kind": 12,
+      "Label": "\u5F88\u9AD8\u7684\u68653",
+      "RouteId": "\u5F88\u9AD8\u7684\u68653",
+      "X": -71.78088,
+      "Y": 0,
+      "Z": 40.22107,
+      "Radius": 10.679,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433491799
+    },
+    {
+      "Id": "c4726b8b5fc14b3c997a9a5f00dd9917",
+      "Kind": 5,
+      "Label": "\u9AD8\u53F0",
+      "RouteId": "",
+      "X": -0.09057617,
+      "Y": 0,
+      "Z": 3.3521729,
+      "Radius": 60.873,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433516480
+    },
+    {
+      "Id": "bff13b28583540f09599d023c642f60c",
+      "Kind": 5,
+      "Label": "\u9AD8\u53F0",
+      "RouteId": "",
+      "X": -33.84723,
+      "Y": 0,
+      "Z": -35.29004,
+      "Radius": 27.766,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433534817
+    },
+    {
+      "Id": "d6ed28053c654cbc87005acf3f693540",
+      "Kind": 5,
+      "Label": "\u9AD8\u53F0",
+      "RouteId": "",
+      "X": 4.0462646,
+      "Y": 0,
+      "Z": -47.579834,
+      "Radius": 27.766,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433539690
+    },
+    {
+      "Id": "bc31a32762644c7d92a6ae7332a11247",
+      "Kind": 5,
+      "Label": "\u9AD8\u53F0",
+      "RouteId": "",
+      "X": 48.084595,
+      "Y": 0,
+      "Z": -14.807068,
+      "Radius": 27.766,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433541237
+    },
+    {
+      "Id": "6fb305ad224840e4bf15141bcd4911dc",
+      "Kind": 5,
+      "Label": "\u9AD8\u53F0",
+      "RouteId": "",
+      "X": 43.988037,
+      "Y": 0,
+      "Z": 17.965698,
+      "Radius": 27.766,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433542237
+    },
+    {
+      "Id": "7173ae5ee95d49ec861f0c5050714770",
+      "Kind": 5,
+      "Label": "\u9AD8\u53F0",
+      "RouteId": "",
+      "X": -16.436707,
+      "Y": 0,
+      "Z": 47.666016,
+      "Radius": 27.766,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433544039
+    },
+    {
+      "Id": "9d608b0c2bdd4af8bd8f2d2d36f37af9",
+      "Kind": 5,
+      "Label": "\u9AD8\u53F0",
+      "RouteId": "",
+      "X": -37.943787,
+      "Y": 0,
+      "Z": 26.158813,
+      "Radius": 27.766,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433545171
+    },
+    {
+      "Id": "da47ebc86bdf4df4a66ddfe76cadefa0",
+      "Kind": 5,
+      "Label": "\u9AD8\u53F0",
+      "RouteId": "",
+      "X": 152.67078,
+      "Y": 0,
+      "Z": -87.418945,
+      "Radius": 57.669,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433559539
+    },
+    {
+      "Id": "aea58308f18a474e98d64c567be9f939",
+      "Kind": 5,
+      "Label": "\u9AD8\u53F0",
+      "RouteId": "",
+      "X": -1.4176636,
+      "Y": 0,
+      "Z": 175.0227,
+      "Radius": 57.669,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433564152
+    },
+    {
+      "Id": "b93c2e96d9ab427f86c3bafd1dc4fd8a",
+      "Kind": 5,
+      "Label": "\u9AD8\u53F0",
+      "RouteId": "",
+      "X": -159.7063,
+      "Y": 0,
+      "Z": -93.0697,
+      "Radius": 57.669,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433566448
+    },
+    {
+      "Id": "55d8a66d4e6241af8af4af053625ab11",
+      "Kind": 6,
+      "Label": "\u4F4E\u5730",
+      "RouteId": "",
+      "X": -127.78546,
+      "Y": 0,
+      "Z": 67.59485,
+      "Radius": 82.232,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433593214
+    },
+    {
+      "Id": "5bde32be2c51401badedeb26d30fbca8",
+      "Kind": 6,
+      "Label": "\u4F4E\u5730",
+      "RouteId": "",
+      "X": 134.71692,
+      "Y": 0,
+      "Z": 74.32568,
+      "Radius": 82.232,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433595850
+    },
+    {
+      "Id": "f57266ec0c1541dea692522727e04893",
+      "Kind": 6,
+      "Label": "\u4F4E\u5730",
+      "RouteId": "",
+      "X": -6.630493,
+      "Y": 0,
+      "Z": -146.10907,
+      "Radius": 82.232,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433598367
+    },
+    {
+      "Id": "3cce2478898f40ecaef941caddf1d072",
+      "Kind": 6,
+      "Label": "\u4F4E\u5730",
+      "RouteId": "",
+      "X": -68.890686,
+      "Y": 0,
+      "Z": -60.290955,
+      "Radius": 36.31,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433606456
+    },
+    {
+      "Id": "b45aae3b2f004b05a9eef654e55b4c95",
+      "Kind": 6,
+      "Label": "\u4F4E\u5730",
+      "RouteId": "",
+      "X": -85.71777,
+      "Y": 0,
+      "Z": -19.905945,
+      "Radius": 36.31,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433607881
+    },
+    {
+      "Id": "a802e78ab71e4f4bb9cc3f2e20141d17",
+      "Kind": 6,
+      "Label": "\u4F4E\u5730",
+      "RouteId": "",
+      "X": 72.45679,
+      "Y": 0,
+      "Z": -70.38721,
+      "Radius": 36.31,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433609786
+    },
+    {
+      "Id": "a6d423f367e041d3af0a9994a18d169d",
+      "Kind": 6,
+      "Label": "\u4F4E\u5730",
+      "RouteId": "",
+      "X": 101.06287,
+      "Y": 0,
+      "Z": -24.954102,
+      "Radius": 36.31,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433611298
+    },
+    {
+      "Id": "d4702b2e5d6a4d07af3b202dfe9aac04",
+      "Kind": 6,
+      "Label": "\u4F4E\u5730",
+      "RouteId": "",
+      "X": -40.284668,
+      "Y": 0,
+      "Z": 91.15283,
+      "Radius": 36.31,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433613738
+    },
+    {
+      "Id": "a032f686eafc44f499a2889921068e69",
+      "Kind": 6,
+      "Label": "\u4F4E\u5730",
+      "RouteId": "",
+      "X": 37.119873,
+      "Y": 0,
+      "Z": 92.83545,
+      "Radius": 36.31,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433614849
+    },
+    {
+      "Id": "fcf3cd46c0ce446ca5fca7c4a89d695b",
+      "Kind": 6,
+      "Label": "\u4F4E\u5730",
+      "RouteId": "",
+      "X": 0.1003418,
+      "Y": 0,
+      "Z": 104.61438,
+      "Radius": 36.31,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433615845
+    },
+    {
+      "Id": "0f3642578bb14b32a2ce79af01ab8857",
+      "Kind": 6,
+      "Label": "\u4F4E\u5730",
+      "RouteId": "",
+      "X": 82.55298,
+      "Y": 0,
+      "Z": 138.26855,
+      "Radius": 36.31,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433617982
+    },
+    {
+      "Id": "0f5cacc2ea9446d3a7cb9e9d7eb2301a",
+      "Kind": 6,
+      "Label": "\u4F4E\u5730",
+      "RouteId": "",
+      "X": -73.93878,
+      "Y": 0,
+      "Z": 138.26855,
+      "Radius": 36.31,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433618992
+    },
+    {
+      "Id": "a91f69db8af6414c9577f1d8750c1dc9",
+      "Kind": 6,
+      "Label": "\u4F4E\u5730",
+      "RouteId": "",
+      "X": -141.24713,
+      "Y": 0,
+      "Z": -9.809692,
+      "Radius": 36.31,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433619860
+    },
+    {
+      "Id": "ca3f2924cb20455b86cbd1bfc022f820",
+      "Kind": 6,
+      "Label": "\u4F4E\u5730",
+      "RouteId": "",
+      "X": 149.86133,
+      "Y": 0,
+      "Z": 1.9692383,
+      "Radius": 36.31,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433621188
+    },
+    {
+      "Id": "ee35c2dd9e4a47739918431d742020cd",
+      "Kind": 6,
+      "Label": "\u4F4E\u5730",
+      "RouteId": "",
+      "X": 75.82214,
+      "Y": 0,
+      "Z": -117.50299,
+      "Radius": 36.31,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433622970
+    },
+    {
+      "Id": "b16719089d1d49e7a6e45785aff5df84",
+      "Kind": 6,
+      "Label": "\u4F4E\u5730",
+      "RouteId": "",
+      "X": -72.2561,
+      "Y": 0,
+      "Z": -125.916565,
+      "Radius": 36.31,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433624346
+    },
+    {
+      "Id": "7954ddb88fae47e999da4ee3b62d6db6",
+      "Kind": 2,
+      "Label": "\u7A84\u53E3",
+      "RouteId": "",
+      "X": -0.0107421875,
+      "Y": 0,
+      "Z": -70.674255,
+      "Radius": 5.34,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433672128
+    },
+    {
+      "Id": "2298093b677849ea9136842cad8120c6",
+      "Kind": 2,
+      "Label": "\u7A84\u53E3",
+      "RouteId": "",
+      "X": 59.205444,
+      "Y": 0,
+      "Z": 35.291504,
+      "Radius": 5.34,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433674000
+    },
+    {
+      "Id": "edeab026d6db43e2854146d67feee4f3",
+      "Kind": 2,
+      "Label": "\u7A84\u53E3",
+      "RouteId": "",
+      "X": -62.966858,
+      "Y": 0,
+      "Z": 37.1615,
+      "Radius": 5.34,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433675132
+    },
+    {
+      "Id": "d13668fba68e4a1f802c8d3e40de36c6",
+      "Kind": 2,
+      "Label": "\u7A84\u53E3",
+      "RouteId": "",
+      "X": 0.03918457,
+      "Y": 0,
+      "Z": 129.56372,
+      "Radius": 8.544,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433689405
+    },
+    {
+      "Id": "3cea76c83e6a49a6be79e5ef7367ab4a",
+      "Kind": 2,
+      "Label": "\u7A84\u53E3",
+      "RouteId": "",
+      "X": -0.696228,
+      "Y": 0,
+      "Z": 117.79541,
+      "Radius": 8.544,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433691286
+    },
+    {
+      "Id": "08587f0cd8ef49b99a011e7fbcd0494e",
+      "Kind": 2,
+      "Label": "\u7A84\u53E3",
+      "RouteId": "",
+      "X": 113.31055,
+      "Y": 0,
+      "Z": -63.14435,
+      "Radius": 8.544,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433692801
+    },
+    {
+      "Id": "8689874446d44ea0aab65c8f01b4f7a3",
+      "Kind": 2,
+      "Label": "\u7A84\u53E3",
+      "RouteId": "",
+      "X": 104.48425,
+      "Y": 0,
+      "Z": -57.26013,
+      "Radius": 8.544,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433693692
+    },
+    {
+      "Id": "e62039e9d27a4321a1533c709f19caae",
+      "Kind": 2,
+      "Label": "\u7A84\u53E3",
+      "RouteId": "",
+      "X": -114.70294,
+      "Y": 0,
+      "Z": -65.35095,
+      "Radius": 8.544,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433694844
+    },
+    {
+      "Id": "183e66ffd84347a280bcfc919e71a929",
+      "Kind": 2,
+      "Label": "\u7A84\u53E3",
+      "RouteId": "",
+      "X": -100.727905,
+      "Y": 0,
+      "Z": -57.26013,
+      "Radius": 8.544,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433695468
+    },
+    {
+      "Id": "85144a1bf1e44fdca6e904e90ac66850",
+      "Kind": 2,
+      "Label": "\u8DF3\u4E0B\u53BB\u4F1A\u6B7B",
+      "RouteId": "1",
+      "X": 32.335938,
+      "Y": 0,
+      "Z": -56.64392,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433755282
+    },
+    {
+      "Id": "49b78467e93143c981c30f5f664979ff",
+      "Kind": 2,
+      "Label": "\u8DF3\u4E0B\u53BB\u4F1A\u6B7B",
+      "RouteId": "1",
+      "X": 8.649414,
+      "Y": 0,
+      "Z": -64.74713,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433756682
+    },
+    {
+      "Id": "a61a9001327b49dda98cc5fdc9baf30c",
+      "Kind": 2,
+      "Label": "\u8DF3\u4E0B\u53BB\u4F1A\u6B7B",
+      "RouteId": "1",
+      "X": -13.167053,
+      "Y": 0,
+      "Z": -69.733765,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433758005
+    },
+    {
+      "Id": "3b63808c8cbd4b20b40dbb02f8b9298f",
+      "Kind": 2,
+      "Label": "\u8DF3\u4E0B\u53BB\u4F1A\u6B7B",
+      "RouteId": "1",
+      "X": -38.10016,
+      "Y": 0,
+      "Z": -62.253845,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433759165
+    },
+    {
+      "Id": "65e1c0c9d6ba44869df0e8e02d7c37e5",
+      "Kind": 2,
+      "Label": "\u8DF3\u4E0B\u53BB\u4F1A\u6B7B",
+      "RouteId": "1",
+      "X": -61.16333,
+      "Y": 0,
+      "Z": -44.177307,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433760553
+    },
+    {
+      "Id": "c2596238cc874469ab80510c2692d7c4",
+      "Kind": 2,
+      "Label": "\u8DF3\u4E0B\u53BB\u4F1A\u6B7B",
+      "RouteId": "1",
+      "X": -65.52661,
+      "Y": 0,
+      "Z": -30.464111,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433761479
+    },
+    {
+      "Id": "c9bb55fbd1d84734ae40b5891622542e",
+      "Kind": 2,
+      "Label": "\u8DF3\u4E0B\u53BB\u4F1A\u6B7B",
+      "RouteId": "1",
+      "X": -49.32007,
+      "Y": 0,
+      "Z": -13.010925,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433762323
+    },
+    {
+      "Id": "aa89abb9dcb7438680371a953c02db3c",
+      "Kind": 2,
+      "Label": "\u8DF3\u4E0B\u53BB\u4F1A\u6B7B",
+      "RouteId": "1",
+      "X": -53.06006,
+      "Y": 0,
+      "Z": -5.530945,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433763403
+    },
+    {
+      "Id": "0dfcb5df29b742599171df77293e022e",
+      "Kind": 2,
+      "Label": "\u8DF3\u4E0B\u53BB\u4F1A\u6B7B",
+      "RouteId": "1",
+      "X": -65.52661,
+      "Y": 0,
+      "Z": -3.6610107,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433764265
+    },
+    {
+      "Id": "65ae2e5f607442ecb64b07fe16428229",
+      "Kind": 2,
+      "Label": "\u8DF3\u4E0B\u53BB\u4F1A\u6B7B",
+      "RouteId": "1",
+      "X": -62.409973,
+      "Y": 0,
+      "Z": 30.62207,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433765261
+    },
+    {
+      "Id": "244e56162fec407b8e121a04480eb477",
+      "Kind": 2,
+      "Label": "\u8DF3\u4E0B\u53BB\u4F1A\u6B7B",
+      "RouteId": "1",
+      "X": -49.94342,
+      "Y": 0,
+      "Z": 49.94519,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433766696
+    },
+    {
+      "Id": "3c60f3b6ffcb47d78edd8874d6b62e1f",
+      "Kind": 2,
+      "Label": "\u8DF3\u4E0B\u53BB\u4F1A\u6B7B",
+      "RouteId": "1",
+      "X": -28.750427,
+      "Y": 0,
+      "Z": 70.515015,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433768368
+    },
+    {
+      "Id": "1f4ec0725ff34f4583055b4fd98f4037",
+      "Kind": 2,
+      "Label": "\u8DF3\u4E0B\u53BB\u4F1A\u6B7B",
+      "RouteId": "1",
+      "X": -14.413879,
+      "Y": 0,
+      "Z": 68.64502,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433769545
+    },
+    {
+      "Id": "36b4589888c442588323a049ac9e3c5f",
+      "Kind": 2,
+      "Label": "\u8DF3\u4E0B\u53BB\u4F1A\u6B7B",
+      "RouteId": "1",
+      "X": -5.687256,
+      "Y": 0,
+      "Z": 73.0083,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433770285
+    },
+    {
+      "Id": "728a959732c5440d9b5de95d8d378c44",
+      "Kind": 2,
+      "Label": "\u8DF3\u4E0B\u53BB\u4F1A\u6B7B",
+      "RouteId": "1",
+      "X": 6.156006,
+      "Y": 0,
+      "Z": 70.515015,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433771215
+    },
+    {
+      "Id": "2c84ce9b2bc54c6884c3b8de373d937e",
+      "Kind": 2,
+      "Label": "\u8DF3\u4E0B\u53BB\u4F1A\u6B7B",
+      "RouteId": "1",
+      "X": 14.259277,
+      "Y": 0,
+      "Z": 46.2052,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433772664
+    },
+    {
+      "Id": "ba5438631bcc4dc682d5e4a67dd612bd",
+      "Kind": 2,
+      "Label": "\u8DF3\u4E0B\u53BB\u4F1A\u6B7B",
+      "RouteId": "1",
+      "X": 27.349121,
+      "Y": 0,
+      "Z": 48.698486,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433773862
+    },
+    {
+      "Id": "fe7554cdff2844688868128f75c2cc67",
+      "Kind": 2,
+      "Label": "\u8DF3\u4E0B\u53BB\u4F1A\u6B7B",
+      "RouteId": "1",
+      "X": 32.335815,
+      "Y": 0,
+      "Z": 57.42505,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433774477
+    },
+    {
+      "Id": "b43595dc926f4e5dbfd965f8127e533a",
+      "Kind": 2,
+      "Label": "\u8DF3\u4E0B\u53BB\u4F1A\u6B7B",
+      "RouteId": "1",
+      "X": 52.90564,
+      "Y": 0,
+      "Z": 41.84192,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433776229
+    },
+    {
+      "Id": "c6e147bf2b7444e69f6679a174c14788",
+      "Kind": 2,
+      "Label": "\u8DF3\u4E0B\u53BB\u4F1A\u6B7B",
+      "RouteId": "1",
+      "X": 69.11218,
+      "Y": 0,
+      "Z": 16.908813,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433777116
+    },
+    {
+      "Id": "cb1a701b3ef54ba7a8949a75013d3711",
+      "Kind": 2,
+      "Label": "\u8DF3\u4E0B\u53BB\u4F1A\u6B7B",
+      "RouteId": "1",
+      "X": 74.098755,
+      "Y": 0,
+      "Z": -11.764343,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433778732
+    },
+    {
+      "Id": "c4ae2063b2274ba1b1e6613cb14111b8",
+      "Kind": 2,
+      "Label": "\u8DF3\u4E0B\u53BB\u4F1A\u6B7B",
+      "RouteId": "1",
+      "X": 62.255493,
+      "Y": 0,
+      "Z": -38.567444,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433780264
+    },
+    {
+      "Id": "893c19747909407fb1c6a2653315deee",
+      "Kind": 2,
+      "Label": "\u8DF3\u4E0B\u53BB\u4F1A\u6B7B",
+      "RouteId": "1",
+      "X": 40.439087,
+      "Y": 0,
+      "Z": -37.94409,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433781576
+    },
+    {
+      "Id": "7b2fe5a109924dfd971988897844679a",
+      "Kind": 2,
+      "Label": "\u8DF3\u4E0B\u53BB\u4F1A\u6B7B",
+      "RouteId": "1",
+      "X": 31.712402,
+      "Y": 0,
+      "Z": -38.567444,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433782571
+    },
+    {
+      "Id": "17f8a730423846b3a14439bb44aaf80d",
+      "Kind": 2,
+      "Label": "\u8DF3\u4E0B\u53BB\u4F1A\u6B7B",
+      "RouteId": "1",
+      "X": 31.712402,
+      "Y": 0,
+      "Z": -54.773987,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433783585
+    },
+    {
+      "Id": "2ef437ac97f743e19e53ee3009be940a",
+      "Kind": 2,
+      "Label": "\u5357\u5D16",
+      "RouteId": "\u5357\u5D16",
+      "X": -80.12274,
+      "Y": 0,
+      "Z": 148.07788,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433806717
+    },
+    {
+      "Id": "921ac773f0c14966b2860c342fa82a32",
+      "Kind": 2,
+      "Label": "\u5357\u5D16",
+      "RouteId": "\u5357\u5D16",
+      "X": -56.688843,
+      "Y": 0,
+      "Z": 143.73828,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433807443
+    },
+    {
+      "Id": "dfc961e718544c378bae0f8bc50205c1",
+      "Kind": 2,
+      "Label": "\u5357\u5D16",
+      "RouteId": "\u5357\u5D16",
+      "X": -41.934143,
+      "Y": 0,
+      "Z": 134.19116,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433808175
+    },
+    {
+      "Id": "2d424840e65b46a38bb440251ede4a14",
+      "Kind": 2,
+      "Label": "\u5357\u5D16",
+      "RouteId": "\u5357\u5D16",
+      "X": -25.443604,
+      "Y": 0,
+      "Z": 125.51196,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433808990
+    },
+    {
+      "Id": "388a1b9c60524743aa1511716faeabae",
+      "Kind": 2,
+      "Label": "\u5357\u5D16",
+      "RouteId": "\u5357\u5D16",
+      "X": -10.688965,
+      "Y": 0,
+      "Z": 122.9082,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433809747
+    },
+    {
+      "Id": "a293c4bf9af9463d8aabab6c9c50854a",
+      "Kind": 2,
+      "Label": "\u5357\u5D16",
+      "RouteId": "\u5357\u5D16",
+      "X": 13.612915,
+      "Y": 0,
+      "Z": 122.04028,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433811083
+    },
+    {
+      "Id": "b848b3bcc1db4742bd34033b8839493f",
+      "Kind": 2,
+      "Label": "\u5357\u5D16",
+      "RouteId": "\u5357\u5D16",
+      "X": 30.971313,
+      "Y": 0,
+      "Z": 128.98364,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433811884
+    },
+    {
+      "Id": "d594f133c5544ea083630349d8d16da6",
+      "Kind": 2,
+      "Label": "\u5357\u5D16",
+      "RouteId": "\u5357\u5D16",
+      "X": 51.801514,
+      "Y": 0,
+      "Z": 142.00244,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433812646
+    },
+    {
+      "Id": "6039a8fb9e8c4fbe81152b41c79ae12c",
+      "Kind": 2,
+      "Label": "\u5357\u5D16",
+      "RouteId": "\u5357\u5D16",
+      "X": 66.55615,
+      "Y": 0,
+      "Z": 150.68164,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433813374
+    },
+    {
+      "Id": "60113f8c9d40405fbe4b5360a8dee41b",
+      "Kind": 2,
+      "Label": "\u4E1C\u5D16",
+      "RouteId": "\u4E1C\u5D16",
+      "X": 93.46167,
+      "Y": 0,
+      "Z": -128.7893,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433825953
+    },
+    {
+      "Id": "1d0889ea1c3f4b2fbc5b39f9de5850d9",
+      "Kind": 2,
+      "Label": "\u4E1C\u5D16",
+      "RouteId": "\u4E1C\u5D16",
+      "X": 97.80139,
+      "Y": 0,
+      "Z": -97.54407,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433826813
+    },
+    {
+      "Id": "07d5c43219d24c0d98384b91ea8bcf79",
+      "Kind": 2,
+      "Label": "\u4E1C\u5D16",
+      "RouteId": "\u4E1C\u5D16",
+      "X": 101.27307,
+      "Y": 0,
+      "Z": -70.63849,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433827439
+    },
+    {
+      "Id": "fffddce11cbb456a9467df3b5df84c9f",
+      "Kind": 2,
+      "Label": "\u4E1C\u5D16",
+      "RouteId": "\u4E1C\u5D16",
+      "X": 122.97107,
+      "Y": 0,
+      "Z": -42.86499,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433828399
+    },
+    {
+      "Id": "dfbc39c0db88422198408b610e9e60db",
+      "Kind": 2,
+      "Label": "\u4E1C\u5D16",
+      "RouteId": "\u4E1C\u5D16",
+      "X": 145.53711,
+      "Y": 0,
+      "Z": -26.37445,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433829159
+    },
+    {
+      "Id": "da16744e21444d058d1fe6a59dc693df",
+      "Kind": 2,
+      "Label": "\u4E1C\u5D16",
+      "RouteId": "\u4E1C\u5D16",
+      "X": 168.97095,
+      "Y": 0,
+      "Z": -11.619812,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433829737
+    },
+    {
+      "Id": "2deeb938f895410f8ba2195ec2cfd9ba",
+      "Kind": 2,
+      "Label": "\u897F\u5D16",
+      "RouteId": "\u897F\u5D16",
+      "X": -92.27362,
+      "Y": 0,
+      "Z": -138.33643,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433839759
+    },
+    {
+      "Id": "3cbf8520bb1441f784e0220e67a5a146",
+      "Kind": 2,
+      "Label": "\u897F\u5D16",
+      "RouteId": "\u897F\u5D16",
+      "X": -97.48114,
+      "Y": 0,
+      "Z": -110.56293,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433840499
+    },
+    {
+      "Id": "8d24500dfbfd403bbed40eda4d8fc2c9",
+      "Kind": 2,
+      "Label": "\u897F\u5D16",
+      "RouteId": "\u897F\u5D16",
+      "X": -94.00946,
+      "Y": 0,
+      "Z": -87.12903,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433841219
+    },
+    {
+      "Id": "030c71650de34405aca11cfdd1099b9c",
+      "Kind": 2,
+      "Label": "\u897F\u5D16",
+      "RouteId": "\u897F\u5D16",
+      "X": -112.23584,
+      "Y": 0,
+      "Z": -47.20459,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433842243
+    },
+    {
+      "Id": "e5a9398008764ade932c0142fd7db9b6",
+      "Kind": 2,
+      "Label": "\u897F\u5D16",
+      "RouteId": "\u897F\u5D16",
+      "X": -140.00934,
+      "Y": 0,
+      "Z": -30.714111,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433843209
+    },
+    {
+      "Id": "6f64f90b15cf49468bd5f98b1804878e",
+      "Kind": 2,
+      "Label": "\u897F\u5D16",
+      "RouteId": "\u897F\u5D16",
+      "X": -160.83948,
+      "Y": 0,
+      "Z": -6.4123535,
+      "Radius": 5.339,
+      "RiskScore": 50,
+      "CreatedAtUnixMs": 1778433844942
+    }
+  ],
+  "Regions": [],
+  "Paths": [
+    {
+      "Kind": 12,
+      "Label": "\u5F88\u9AD8\u7684\u68651",
+      "RouteId": "\u5F88\u9AD8\u7684\u68651",
+      "Points": [
+        {
+          "X": -0.09033203,
+          "Y": 0,
+          "Z": -72.43506
+        },
+        {
+          "X": -1.114502,
+          "Y": 0,
+          "Z": -83.70068
+        }
+      ],
+      "WorldY": 0,
+      "Width": 16,
+      "RiskScore": 50,
+      "IsOneWay": false
+    },
+    {
+      "Kind": 12,
+      "Label": "\u5F88\u9AD8\u7684\u68652",
+      "RouteId": "\u5F88\u9AD8\u7684\u68652",
+      "Points": [
+        {
+          "X": 61.35852,
+          "Y": 0,
+          "Z": 35.100464
+        },
+        {
+          "X": 71.6001,
+          "Y": 0,
+          "Z": 41.24536
+        }
+      ],
+      "WorldY": 0,
+      "Width": 16,
+      "RiskScore": 50,
+      "IsOneWay": false
+    },
+    {
+      "Kind": 12,
+      "Label": "\u5F88\u9AD8\u7684\u68653",
+      "RouteId": "\u5F88\u9AD8\u7684\u68653",
+      "Points": [
+        {
+          "X": -59.49109,
+          "Y": 0,
+          "Z": 36.12451
+        },
+        {
+          "X": -71.78088,
+          "Y": 0,
+          "Z": 40.22107
+        }
+      ],
+      "WorldY": 0,
+      "Width": 16,
+      "RiskScore": 50,
+      "IsOneWay": false
+    },
+    {
+      "Kind": 10,
+      "Label": "\u8DF3\u4E0B\u53BB\u4F1A\u6B7B",
+      "RouteId": "1",
+      "Points": [
+        {
+          "X": 32.335938,
+          "Y": 0,
+          "Z": -56.64392
+        },
+        {
+          "X": 8.649414,
+          "Y": 0,
+          "Z": -64.74713
+        },
+        {
+          "X": -13.167053,
+          "Y": 0,
+          "Z": -69.733765
+        },
+        {
+          "X": -38.10016,
+          "Y": 0,
+          "Z": -62.253845
+        },
+        {
+          "X": -61.16333,
+          "Y": 0,
+          "Z": -44.177307
+        },
+        {
+          "X": -65.52661,
+          "Y": 0,
+          "Z": -30.464111
+        },
+        {
+          "X": -49.32007,
+          "Y": 0,
+          "Z": -13.010925
+        },
+        {
+          "X": -53.06006,
+          "Y": 0,
+          "Z": -5.530945
+        },
+        {
+          "X": -65.52661,
+          "Y": 0,
+          "Z": -3.6610107
+        },
+        {
+          "X": -62.409973,
+          "Y": 0,
+          "Z": 30.62207
+        },
+        {
+          "X": -49.94342,
+          "Y": 0,
+          "Z": 49.94519
+        },
+        {
+          "X": -28.750427,
+          "Y": 0,
+          "Z": 70.515015
+        },
+        {
+          "X": -14.413879,
+          "Y": 0,
+          "Z": 68.64502
+        },
+        {
+          "X": -5.687256,
+          "Y": 0,
+          "Z": 73.0083
+        },
+        {
+          "X": 6.156006,
+          "Y": 0,
+          "Z": 70.515015
+        },
+        {
+          "X": 14.259277,
+          "Y": 0,
+          "Z": 46.2052
+        },
+        {
+          "X": 27.349121,
+          "Y": 0,
+          "Z": 48.698486
+        },
+        {
+          "X": 32.335815,
+          "Y": 0,
+          "Z": 57.42505
+        },
+        {
+          "X": 52.90564,
+          "Y": 0,
+          "Z": 41.84192
+        },
+        {
+          "X": 69.11218,
+          "Y": 0,
+          "Z": 16.908813
+        },
+        {
+          "X": 74.098755,
+          "Y": 0,
+          "Z": -11.764343
+        },
+        {
+          "X": 62.255493,
+          "Y": 0,
+          "Z": -38.567444
+        },
+        {
+          "X": 40.439087,
+          "Y": 0,
+          "Z": -37.94409
+        },
+        {
+          "X": 31.712402,
+          "Y": 0,
+          "Z": -38.567444
+        },
+        {
+          "X": 31.712402,
+          "Y": 0,
+          "Z": -54.773987
+        }
+      ],
+      "WorldY": 0,
+      "Width": 9,
+      "RiskScore": 50,
+      "IsOneWay": false
+    },
+    {
+      "Kind": 10,
+      "Label": "\u5357\u5D16",
+      "RouteId": "\u5357\u5D16",
+      "Points": [
+        {
+          "X": -80.12274,
+          "Y": 0,
+          "Z": 148.07788
+        },
+        {
+          "X": -56.688843,
+          "Y": 0,
+          "Z": 143.73828
+        },
+        {
+          "X": -41.934143,
+          "Y": 0,
+          "Z": 134.19116
+        },
+        {
+          "X": -25.443604,
+          "Y": 0,
+          "Z": 125.51196
+        },
+        {
+          "X": -10.688965,
+          "Y": 0,
+          "Z": 122.9082
+        },
+        {
+          "X": 13.612915,
+          "Y": 0,
+          "Z": 122.04028
+        },
+        {
+          "X": 30.971313,
+          "Y": 0,
+          "Z": 128.98364
+        },
+        {
+          "X": 51.801514,
+          "Y": 0,
+          "Z": 142.00244
+        },
+        {
+          "X": 66.55615,
+          "Y": 0,
+          "Z": 150.68164
+        }
+      ],
+      "WorldY": 0,
+      "Width": 9,
+      "RiskScore": 50,
+      "IsOneWay": false
+    },
+    {
+      "Kind": 10,
+      "Label": "\u4E1C\u5D16",
+      "RouteId": "\u4E1C\u5D16",
+      "Points": [
+        {
+          "X": 93.46167,
+          "Y": 0,
+          "Z": -128.7893
+        },
+        {
+          "X": 97.80139,
+          "Y": 0,
+          "Z": -97.54407
+        },
+        {
+          "X": 101.27307,
+          "Y": 0,
+          "Z": -70.63849
+        },
+        {
+          "X": 122.97107,
+          "Y": 0,
+          "Z": -42.86499
+        },
+        {
+          "X": 145.53711,
+          "Y": 0,
+          "Z": -26.37445
+        },
+        {
+          "X": 168.97095,
+          "Y": 0,
+          "Z": -11.619812
+        }
+      ],
+      "WorldY": 0,
+      "Width": 9,
+      "RiskScore": 50,
+      "IsOneWay": false
+    },
+    {
+      "Kind": 10,
+      "Label": "\u897F\u5D16",
+      "RouteId": "\u897F\u5D16",
+      "Points": [
+        {
+          "X": -92.27362,
+          "Y": 0,
+          "Z": -138.33643
+        },
+        {
+          "X": -97.48114,
+          "Y": 0,
+          "Z": -110.56293
+        },
+        {
+          "X": -94.00946,
+          "Y": 0,
+          "Z": -87.12903
+        },
+        {
+          "X": -112.23584,
+          "Y": 0,
+          "Z": -47.20459
+        },
+        {
+          "X": -140.00934,
+          "Y": 0,
+          "Z": -30.714111
+        },
+        {
+          "X": -160.83948,
+          "Y": 0,
+          "Z": -6.4123535
+        }
+      ],
+      "WorldY": 0,
+      "Width": 9,
+      "RiskScore": 50,
+      "IsOneWay": false
+    }
+  ]
+}

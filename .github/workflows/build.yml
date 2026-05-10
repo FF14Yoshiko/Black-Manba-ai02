@@ -1,0 +1,46 @@
+name: Build Plugin
+
+on:
+  workflow_dispatch:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore Dalamud API 15
+        shell: pwsh
+        run: |
+          $destination = Join-Path $env:APPDATA "XIVLauncherCN\addon\Hooks\dev"
+          New-Item -ItemType Directory -Force -Path $destination | Out-Null
+          $archivePath = Join-Path $env:RUNNER_TEMP "dalamud-api15.zip"
+          Invoke-WebRequest "https://github.com/goatcorp/dalamud-distrib/raw/main/api15/latest.zip" -OutFile $archivePath
+          Expand-Archive -Path $archivePath -DestinationPath $destination -Force
+
+      - name: Restore dependencies
+        run: dotnet restore ai02.csproj
+
+      - name: Build release package
+        run: dotnet build ai02.csproj -c Release --no-restore
+
+      - name: Validate package
+        shell: pwsh
+        run: ./scripts/Validate-Package.ps1 -PackagePath "bin/Release/ai02/latest.zip"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai02-release
+          path: |
+            bin/Release/ai02/latest.zip
+            bin/Release/ai02/latest.zip.sha256

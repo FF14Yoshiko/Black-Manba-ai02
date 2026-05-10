@@ -1,0 +1,16 @@
+{
+  "Author": "肘击",
+  "Name": "前线战术指挥",
+  "InternalName": "ai02",
+  "AssemblyVersion": "1.1.0.0",
+  "Description": "纷争前线的战场态势感知、战术决策与战斗指挥界面。",
+  "ApplicableVersion": "any",
+  "Tags": ["frontline", "radar", "decision-support", "pvp"],
+  "DalamudApiLevel": 15,
+  "LoadRequiredState": 0,
+  "LoadSync": true,
+  "CanUnloadAsync": false,
+  "LoadPriority": 0,
+  "Punchline": "把战场读懂，再把下一步说清楚。",
+  "AcceptsFeedback": false
+}

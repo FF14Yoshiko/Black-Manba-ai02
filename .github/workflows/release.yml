@@ -1,0 +1,97 @@
+name: Release Plugin
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "发布标签，例如 v1.1.1"
+        required: true
+        type: string
+      release_name:
+        description: "发布标题，留空则默认使用标签名"
+        required: false
+        type: string
+      prerelease:
+        description: "是否标记为预发布"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore Dalamud API 15
+        shell: pwsh
+        run: |
+          $destination = Join-Path $env:APPDATA "XIVLauncherCN\addon\Hooks\dev"
+          New-Item -ItemType Directory -Force -Path $destination | Out-Null
+          $archivePath = Join-Path $env:RUNNER_TEMP "dalamud-api15.zip"
+          Invoke-WebRequest "https://github.com/goatcorp/dalamud-distrib/raw/main/api15/latest.zip" -OutFile $archivePath
+          Expand-Archive -Path $archivePath -DestinationPath $destination -Force
+
+      - name: Restore dependencies
+        run: dotnet restore ai02.csproj
+
+      - name: Build release package
+        run: dotnet build ai02.csproj -c Release --no-restore
+
+      - name: Validate package
+        shell: pwsh
+        run: ./scripts/Validate-Package.ps1 -PackagePath "bin/Release/ai02/latest.zip"
+
+      - name: Resolve release metadata
+        id: release_meta
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $tag = "${{ github.event.inputs.tag_name }}".Trim()
+            $name = "${{ github.event.inputs.release_name }}".Trim()
+            $prerelease = "${{ github.event.inputs.prerelease }}"
+          }
+          else {
+            $tag = "${{ github.ref_name }}".Trim()
+            $name = ""
+            $prerelease = "false"
+          }
+
+          if ([string]::IsNullOrWhiteSpace($tag)) {
+            throw "发布标签不能为空。"
+          }
+
+          if ([string]::IsNullOrWhiteSpace($name)) {
+            $name = $tag
+          }
+
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "name=$name" >> $env:GITHUB_OUTPUT
+          "prerelease=$prerelease" >> $env:GITHUB_OUTPUT
+
+      - name: Create GitHub release and upload assets
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.release_meta.outputs.tag }}
+          name: ${{ steps.release_meta.outputs.name }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          prerelease: ${{ steps.release_meta.outputs.prerelease }}
+          overwrite_files: true
+          fail_on_unmatched_files: true
+          files: |
+            bin/Release/ai02/latest.zip
+            bin/Release/ai02/latest.zip.sha256

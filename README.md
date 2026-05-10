@@ -141,6 +141,18 @@ bin/Release/ai02/latest.zip
 
 CI 会自动恢复 Dalamud 开发依赖、构建 Release 包，并校验 `latest.zip`。
 
+## 下载
+
+- 想直接下载成品，请看 GitHub 的 **Releases**
+- Release 资产会包含：
+  - `latest.zip`
+  - `latest.zip.sha256`
+
+发布方式也已经配好：
+
+- 推送标签（例如 `v1.1.1`）后，GitHub Actions 会自动构建并创建 Release
+- 也可以在 Actions 页手动运行 `Release Plugin` 工作流，指定标签名后发布
+
 ## Roadmap
 
 - 把更多 `FrontlineKnowledgeBase` 规则转成可量化 bias

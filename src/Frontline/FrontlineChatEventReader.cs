@@ -208,17 +208,27 @@ public sealed class FrontlineChatEventReader : IDisposable
         long now,
         out ChatEventEntry entry)
     {
-        if (TryParseKill(text, sender, sourceKind, targetKind, now, logKind, out entry))
-            return true;
+        if (!FrontlineChatEventTextParser.TryParse(text, sender, InferSide(sourceKind), InferSide(targetKind), out var parsed))
+        {
+            entry = default;
+            return false;
+        }
 
-        if (TryParseBattleHigh(text, sender, sourceKind, now, logKind, out entry))
-            return true;
-
-        if (TryParseObjective(text, now, logKind, out entry))
-            return true;
-
-        entry = default;
-        return false;
+        entry = new ChatEventEntry(
+            now,
+            $"聊天/{logKind}",
+            text,
+            parsed.Kind,
+            parsed.ActorName,
+            parsed.TargetName,
+            parsed.ActorSide,
+            parsed.TargetSide,
+            parsed.Ownership,
+            parsed.LocationId,
+            parsed.ObjectiveName,
+            parsed.BattleHighLevel,
+            parsed.BattleHighDelta);
+        return true;
     }
 
     private static bool TryParseKill(

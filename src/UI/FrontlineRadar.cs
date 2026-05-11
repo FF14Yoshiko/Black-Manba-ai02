@@ -99,7 +99,7 @@ public sealed class FrontlineRadar : IDisposable
         if (!config.Enabled || !config.MapRadar || !CanDraw(config, worldState))
             return;
 
-        if (!areaMapProjectionService.TryGetSnapshot(out var mapSnapshot))
+        if (!areaMapProjectionService.TryGetRealtimeSnapshot(out var mapSnapshot))
         {
             LogMapRadarDebug("AreaMap is visible, but projection snapshot is unavailable");
             return;

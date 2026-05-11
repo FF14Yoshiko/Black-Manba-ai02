@@ -54,10 +54,10 @@ public sealed class TacticalDecisionEngineService
             .ToArray();
 
         BattlefieldObjectivePrioritySnapshot? primary = priorities.Length > 0 ? priorities[0] : null;
-        if (primary.HasValue && ShouldHoldObjectivePosition(primary.Value, timeSituation))
+        if (primary.HasValue && ShouldPreferAlternateObjective(primary.Value, timeSituation))
         {
             var alternate = priorities
-                .Where(item => !ShouldHoldObjectivePosition(item, timeSituation))
+                .Where(item => !ShouldPreferAlternateObjective(item, timeSituation))
                 .OrderByDescending(item => item.PriorityScore)
                 .ThenBy(item => item.MountedEtaSeconds)
                 .FirstOrDefault();
@@ -1178,6 +1178,26 @@ public sealed class TacticalDecisionEngineService
         }
 
         return true;
+    }
+
+    private static bool ShouldPreferAlternateObjective(
+        BattlefieldObjectivePrioritySnapshot objective,
+        BattlefieldTimeSituationSnapshot timeSituation)
+    {
+        if (ShouldHoldObjectivePosition(objective, timeSituation))
+            return true;
+
+        if (IsFinalMinuteAllIn(timeSituation) && IsHighValueObjective(objective))
+            return false;
+
+        if (IsHighValueObjective(objective))
+            return false;
+
+        return objective.CrossfirePenalty >= 24f
+            || (objective.CrossfirePenalty >= 18f && objective.EnemyDoorstepPenalty >= 18f)
+            || (objective.CrossfirePenalty >= 18f && objective.RouteBlockPenalty >= 20f)
+            || (objective.CrossfirePenalty >= 14f && objective.LongTravelPenalty >= 20f)
+            || (objective.EnemyDoorstepPenalty >= 26f && objective.LongTravelPenalty >= 18f);
     }
 
     private static float ResolveObjectiveRisk(
@@ -5680,7 +5700,7 @@ public sealed class TacticalDecisionEngineService
         if (priorities.Count >= 2 && !finalMinuteAllIn && !IsFatalRisk(risk) && risk.CohesionRisk <= 64f)
         {
             var second = priorities[1];
-            if (!ShouldHoldObjectivePosition(second, timeSituation)
+            if (!ShouldPreferAlternateObjective(second, timeSituation)
                 && second.PriorityScore >= 50f
                 && second.RiskScore <= 82f
                 && second.MountedEtaSeconds <= 42)
@@ -7154,6 +7174,9 @@ public sealed class TacticalDecisionEngineService
         if (!fatal && friendly.HasValue && friendlyBattleHighReady && friendlyFlowLow && enemyFlowHigh)
         {
             var target = string.IsNullOrWhiteSpace(highestEnemyFlow.Name) ? "跳分家" : highestEnemyFlow.Name;
+            var destinationName = primary.HasValue && !string.IsNullOrWhiteSpace(primary.Value.Name)
+                ? primary.Value.Name
+                : "下一目标点";
             var destination = primary.HasValue && IsMeaningfulPosition(primary.Value.Position)
                 ? primary.Value.Position
                 : teamSituation.EnemyMainGroupMovement.HasMainGroup ? teamSituation.EnemyMainGroupMovement.CurrentCenter : anchor;
@@ -7162,14 +7185,14 @@ public sealed class TacticalDecisionEngineService
                 "tempo:stop-farming-score",
                 BattlefieldCommandKind.Rotate,
                 "主团",
-                $"战意够了，别一直刷散人，转去断 {target} 的点",
+                $"转去 {destinationName} 压 {target}",
                 Math.Clamp(70f + teamSituation.Friendly.BattleHighTotalLevel * 0.7f + highestEnemyFlow.ScoreDelta30s * 0.22f, 0f, 94f),
                 Math.Clamp(64f + highestEnemyFlow.ScoreDelta30s * 0.28f, 0f, 92f),
                 10,
                 destination,
-                target,
-                "拿散人提战意要有度；我方有战意但没跳分时，应转为断分/摸点，避免第三家满屏拿点",
-                $"我方跳分 {friendly.Value.ScoreDelta30s}/30s；我方战意 {teamSituation.Friendly.BattleHighTotalLevel} 狂热 {teamSituation.Friendly.BattleFeverCount}；{target} 跳分 {highestEnemyFlow.ScoreDelta30s}/30s");
+                destinationName,
+                "拿散人提战意要有度；我方有战意但没跳分时，应转为抢点/压点，避免第三家满屏拿点",
+                $"我方跳分 {friendly.Value.ScoreDelta30s}/30s；我方战意 {teamSituation.Friendly.BattleHighTotalLevel} 狂热 {teamSituation.Friendly.BattleFeverCount}；目标 {destinationName}；对面 {target} 跳分 {highestEnemyFlow.ScoreDelta30s}/30s");
         }
 
         if (!fatal

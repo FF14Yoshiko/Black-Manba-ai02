@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
+    <PackageReference Include="xunit" Version="2.6.6" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.7">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="coverlet.collector" Version="6.0.2">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\src\Models\FrontlineModels.cs" Link="Source\Models\FrontlineModels.cs" />
+    <Compile Include="..\..\src\Models\PlayerFrameEventModels.cs" Link="Source\Models\PlayerFrameEventModels.cs" />
+    <Compile Include="..\..\src\Decision\StrategicArbitrationService.cs" Link="Source\Decision\StrategicArbitrationService.cs" />
+    <Compile Include="..\..\src\Map\MapAnnotationService.cs" Link="Source\Map\MapAnnotationService.cs" />
+    <Compile Include="..\..\src\Map\MapTacticalGraphModels.cs" Link="Source\Map\MapTacticalGraphModels.cs" />
+    <Compile Include="..\..\src\Map\MapRouteRiskEvaluator.cs" Link="Source\Map\MapRouteRiskEvaluator.cs" />
+    <Compile Include="..\..\src\Decision\TacticalDecisionEngineService.cs" Link="Source\Decision\TacticalDecisionEngineService.cs" />
+    <Compile Include="..\..\src\Decision\LlmDecisionResponseParser.cs" Link="Source\Decision\LlmDecisionResponseParser.cs" />
+    <Compile Include="..\..\src\Decision\LlmGateSchedulingPolicy.cs" Link="Source\Decision\LlmGateSchedulingPolicy.cs" />
+    <Compile Include="..\..\src\Decision\LlmRoutinePulsePolicy.cs" Link="Source\Decision\LlmRoutinePulsePolicy.cs" />
+    <Compile Include="..\..\src\Frontline\FrontlineAnnouncementTextParser.cs" Link="Source\Frontline\FrontlineAnnouncementTextParser.cs" />
+    <Compile Include="..\..\src\Frontline\FrontlineChatEventTextParser.cs" Link="Source\Frontline\FrontlineChatEventTextParser.cs" />
+    <Compile Include="..\..\src\Frontline\FrontlineScoreConfirmationPolicy.cs" Link="Source\Frontline\FrontlineScoreConfirmationPolicy.cs" />
+    <Compile Include="..\..\src\Frontline\FrontlineScoreTextParser.cs" Link="Source\Frontline\FrontlineScoreTextParser.cs" />
+    <Compile Include="..\..\src\UI\CommandOverlayAiDisplayPolicy.cs" Link="Source\UI\CommandOverlayAiDisplayPolicy.cs" />
+  </ItemGroup>
+</Project>

@@ -25,7 +25,6 @@ public class Plugin : IDalamudPlugin
     private ICommandManager CommandManager { get; init; }
     public IClientState ClientState { get; init; }
     public IObjectTable ObjectTable { get; init; }
-    public ITargetManager TargetManager { get; init; }
     public IFramework Framework { get; init; }
     public IGameGui GameGui { get; init; }
     public IPartyList PartyList { get; init; }
@@ -41,7 +40,6 @@ public class Plugin : IDalamudPlugin
     public AreaMapProjectionService AreaMapProjectionService { get; init; }
     public FrontlineRadar FrontlineRadar { get; init; }
     public FloatingToggle FloatingToggle { get; init; }
-    public CameraDistanceService CameraDistanceService { get; init; }
     public LimitBreakService LimitBreakService { get; init; }
     public FrontlineAnnouncementReader FrontlineAnnouncementReader { get; init; }
     public FrontlineChatEventReader FrontlineChatEventReader { get; init; }
@@ -53,9 +51,9 @@ public class Plugin : IDalamudPlugin
     public MapTacticalAnalysisService MapTacticalAnalysisService { get; init; }
     public TacticalDecisionEngineService TacticalDecisionEngineService { get; init; }
     public LlmStrategicDecisionService LlmStrategicDecisionService { get; init; }
+    public StrategicArbitrationService StrategicArbitrationService { get; init; }
     public BattlefieldReplayRecorder BattlefieldReplayRecorder { get; init; }
     public CommandOverlayService CommandOverlayService { get; init; }
-    public AutoTargetMarkerService AutoTargetMarkerService { get; init; }
 
     public StatusEffectTracker StatusEffectTracker { get; init; }
     public ISigScanner SigScanner { get; init; }
@@ -69,7 +67,6 @@ public class Plugin : IDalamudPlugin
         ICommandManager commandManager,
         IClientState clientState,
         IObjectTable objectTable,
-        ITargetManager targetManager,
         IFramework framework,
         IGameGui gameGui,
         IPartyList partyList,
@@ -86,7 +83,6 @@ public class Plugin : IDalamudPlugin
         CommandManager = commandManager;
         ClientState = clientState;
         ObjectTable = objectTable;
-        TargetManager = targetManager;
         Framework = framework;
         GameGui = gameGui;
         PartyList = partyList;
@@ -99,7 +95,6 @@ public class Plugin : IDalamudPlugin
         DataManager = dataManager;
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         Configuration.Initialize(PluginInterface);
-        CameraDistanceService = new CameraDistanceService(Configuration, sigScanner, gameInteropProvider, log);
         LimitBreakService = new LimitBreakService(Configuration, clientState, gameGui, log);
         FrontlineAnnouncementReader = new FrontlineAnnouncementReader(gameGui, log);
         FrontlineChatEventReader = new FrontlineChatEventReader(chatGui, clientState, log);
@@ -113,11 +108,11 @@ public class Plugin : IDalamudPlugin
         MapTacticalAnalysisService = new MapTacticalAnalysisService(MapAnnotationService, MapTacticalGraphService);
         TacticalDecisionEngineService = new TacticalDecisionEngineService();
         LlmStrategicDecisionService = new LlmStrategicDecisionService(Configuration, log);
+        StrategicArbitrationService = new StrategicArbitrationService();
         BattlefieldReplayRecorder = new BattlefieldReplayRecorder(Configuration, log);
         CommandOverlayService = new CommandOverlayService(Configuration, PluginInterface.UiBuilder);
-        AutoTargetMarkerService = new AutoTargetMarkerService(Configuration, commandManager, targetManager, objectTable, log);
         StatusEffectTracker = new StatusEffectTracker(Configuration, objectTable, clientState, framework, log);
-        WorldStateService = new WorldStateService(Configuration, clientState, objectTable, framework, condition, log, FrontlineScoreReader, AreaMapProjectionService, LimitBreakService, FrontlineAnnouncementReader, FrontlineChatEventReader, FrontlineKeySkillEventReader, StatusEffectTracker, MapTacticalAnalysisService, TacticalDecisionEngineService, LlmStrategicDecisionService, BattlefieldReplayRecorder);
+        WorldStateService = new WorldStateService(Configuration, clientState, objectTable, framework, condition, log, FrontlineScoreReader, AreaMapProjectionService, LimitBreakService, FrontlineAnnouncementReader, FrontlineChatEventReader, FrontlineKeySkillEventReader, StatusEffectTracker, MapTacticalAnalysisService, TacticalDecisionEngineService, LlmStrategicDecisionService, StrategicArbitrationService, BattlefieldReplayRecorder);
         FrontlineRadar = new FrontlineRadar(this, gameGui, textureProvider, dataManager, log, AreaMapProjectionService);
         FloatingToggle = new FloatingToggle(this);
         MainWindow = new MainWindow(this);
@@ -161,8 +156,6 @@ public class Plugin : IDalamudPlugin
         BattlefieldReplayRecorder.Dispose();
         LlmStrategicDecisionService.Dispose();
         CommandOverlayService.Dispose();
-        AutoTargetMarkerService.Dispose();
-        CameraDistanceService.Dispose();
         AreaMapProjectionService.Dispose();
         StatusEffectTracker.Dispose();
     }

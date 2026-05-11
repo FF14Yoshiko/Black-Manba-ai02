@@ -25,11 +25,6 @@ public sealed class FrontlineScoreReader : IDisposable
     private const int MaxReadableScore = 3000;
     private const int MinReadableScoreLimit = 100;
     private const int MaxMatchTimeSeconds = 20 * 60;
-    private const int NoPendingScore = -1;
-    private const int MaxUnconfirmedScoreIncrease = 120;
-    private const int MaxTrustedScoreDecrease = 64;
-    private const int MaxHardRejectedScoreDecrease = 120;
-    private const int ScoreChangeConfirmationReads = 2;
     private const int DefaultUpdateIntervalMs = 1000;
     private const long FrontlineDetectionCacheMs = 2500;
     private const long FrontlineDetectionGraceMs = 15000;
@@ -70,11 +65,11 @@ public sealed class FrontlineScoreReader : IDisposable
     private int _immortalFlamesScore;
     private int _scoreLimit;
     private int _matchTimeSeconds;
-    private int _pendingMaelstromScore = NoPendingScore;
+    private int _pendingMaelstromScore = FrontlineScoreConfirmationPolicy.NoPendingScore;
     private int _pendingMaelstromScoreReads;
-    private int _pendingTwinAdderScore = NoPendingScore;
+    private int _pendingTwinAdderScore = FrontlineScoreConfirmationPolicy.NoPendingScore;
     private int _pendingTwinAdderScoreReads;
-    private int _pendingImmortalFlamesScore = NoPendingScore;
+    private int _pendingImmortalFlamesScore = FrontlineScoreConfirmationPolicy.NoPendingScore;
     private int _pendingImmortalFlamesScoreReads;
     private long _lastUpdateTicks;
     private int _matchTimeAnchorSeconds;
@@ -600,7 +595,7 @@ public sealed class FrontlineScoreReader : IDisposable
                 $"type={objectiveTypes[i]}"));
         }
 
-        return TryBuildStructuredScoreResult(rows, "ToDoListArray", out result);
+        return TryBuildScoreReadResult(rows, "ToDoListArray", out result);
     }
 
     private unsafe bool TryReadDirectorTodoScoreData(out ScoreReadResult result)
@@ -620,7 +615,7 @@ public sealed class FrontlineScoreReader : IDisposable
         if (instanceDirector != null && (nint)instanceDirector != (nint)contentDirector)
             AddDirectorTodoScoreRows(rows, "InstanceContentDirector", instanceDirector->GetDirectorTodos());
 
-        return TryBuildStructuredScoreResult(rows, "DirectorTodo", out result);
+        return TryBuildScoreReadResult(rows, "DirectorTodo", out result);
     }
 
     private static unsafe void AddDirectorTodoScoreRows(List<StructuredScoreRow> rows, string source, StdVector<DirectorTodo>* todos)
@@ -643,6 +638,26 @@ public sealed class FrontlineScoreReader : IDisposable
                 IsValidScoreLimit(todo.NeededCount) ? todo.NeededCount : null,
                 $"{source}/{todo.Type}"));
         }
+    }
+
+    private static bool TryBuildScoreReadResult(IReadOnlyList<StructuredScoreRow> rows, string source, out ScoreReadResult result)
+    {
+        var parserRows = rows
+            .Select(row => new FrontlineStructuredScoreRow(row.Index, row.Text, row.Value, row.NeededCount, row.Source))
+            .ToArray();
+        if (FrontlineScoreTextParser.TryBuildStructuredScoreResult(parserRows, source, out var parsed))
+        {
+            result = new ScoreReadResult(
+                parsed.Maelstrom,
+                parsed.TwinAdder,
+                parsed.ImmortalFlames,
+                parsed.ScoreLimit,
+                parsed.Source);
+            return true;
+        }
+
+        result = default;
+        return false;
     }
 
     private static bool TryBuildStructuredScoreResult(IReadOnlyList<StructuredScoreRow> rows, string source, out ScoreReadResult result)
@@ -808,19 +823,19 @@ public sealed class FrontlineScoreReader : IDisposable
         if (HasScorePayload(result))
         {
             var heldScoreForConfirmation = false;
-            heldScoreForConfirmation |= !TryApplyScoreCandidate(
+            heldScoreForConfirmation |= !FrontlineScoreConfirmationPolicy.TryApplyCandidate(
                 ref _maelstromScore,
                 ref _pendingMaelstromScore,
                 ref _pendingMaelstromScoreReads,
                 result.Maelstrom,
                 true);
-            heldScoreForConfirmation |= !TryApplyScoreCandidate(
+            heldScoreForConfirmation |= !FrontlineScoreConfirmationPolicy.TryApplyCandidate(
                 ref _twinAdderScore,
                 ref _pendingTwinAdderScore,
                 ref _pendingTwinAdderScoreReads,
                 result.TwinAdder,
                 true);
-            heldScoreForConfirmation |= !TryApplyScoreCandidate(
+            heldScoreForConfirmation |= !FrontlineScoreConfirmationPolicy.TryApplyCandidate(
                 ref _immortalFlamesScore,
                 ref _pendingImmortalFlamesScore,
                 ref _pendingImmortalFlamesScoreReads,
@@ -840,82 +855,11 @@ public sealed class FrontlineScoreReader : IDisposable
         _state = FrontlineScoreReaderState.Ready;
     }
 
-    private static bool TryApplyScoreCandidate(
-        ref int currentScore,
-        ref int pendingScore,
-        ref int pendingReads,
-        int incomingScore,
-        bool countConfirmationRead)
-    {
-        if (!IsValidFrontlineScore(incomingScore))
-            return false;
-
-        if (currentScore == incomingScore)
-        {
-            ClearPendingScore(ref pendingScore, ref pendingReads);
-            return true;
-        }
-
-        if (currentScore <= 0)
-        {
-            currentScore = incomingScore;
-            ClearPendingScore(ref pendingScore, ref pendingReads);
-            return true;
-        }
-
-        var increase = incomingScore - currentScore;
-        var decrease = currentScore - incomingScore;
-
-        if (increase is > 0 and <= MaxUnconfirmedScoreIncrease)
-        {
-            currentScore = incomingScore;
-            ClearPendingScore(ref pendingScore, ref pendingReads);
-            return true;
-        }
-
-        if (decrease is > 0 and <= MaxTrustedScoreDecrease)
-        {
-            currentScore = incomingScore;
-            ClearPendingScore(ref pendingScore, ref pendingReads);
-            return true;
-        }
-
-        if (decrease > MaxHardRejectedScoreDecrease)
-        {
-            ClearPendingScore(ref pendingScore, ref pendingReads);
-            return false;
-        }
-
-        if (pendingScore == incomingScore)
-        {
-            if (countConfirmationRead)
-                pendingReads++;
-        }
-        else
-        {
-            pendingScore = incomingScore;
-            pendingReads = countConfirmationRead ? 1 : 0;
-        }
-
-        if (pendingReads < ScoreChangeConfirmationReads)
-            return false;
-
-        currentScore = incomingScore;
-        ClearPendingScore(ref pendingScore, ref pendingReads);
-        return true;
-    }
-
     private void ClearPendingScores()
     {
-        ClearPendingScore(ref _pendingMaelstromScore, ref _pendingMaelstromScoreReads);
-        ClearPendingScore(ref _pendingTwinAdderScore, ref _pendingTwinAdderScoreReads);
-        ClearPendingScore(ref _pendingImmortalFlamesScore, ref _pendingImmortalFlamesScoreReads);
-    }
-
-    private static void ClearPendingScore(ref int pendingScore, ref int pendingReads)
-    {
-        pendingScore = NoPendingScore;
-        pendingReads = 0;
+        FrontlineScoreConfirmationPolicy.ClearPendingScore(ref _pendingMaelstromScore, ref _pendingMaelstromScoreReads);
+        FrontlineScoreConfirmationPolicy.ClearPendingScore(ref _pendingTwinAdderScore, ref _pendingTwinAdderScoreReads);
+        FrontlineScoreConfirmationPolicy.ClearPendingScore(ref _pendingImmortalFlamesScore, ref _pendingImmortalFlamesScoreReads);
     }
 
     private bool HasAnyScore()

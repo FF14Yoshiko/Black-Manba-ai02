@@ -38,6 +38,13 @@ public sealed class FrontlineKeySkillEventReader : IDisposable
     private readonly IPluginLog log;
     private readonly List<RawCombatLine> rawLines = new();
     private readonly Dictionary<string, long> lastSeenByKey = new(StringComparer.Ordinal);
+    private BattlefieldKeySkillUseSnapshot[] cachedMergedEvents = Array.Empty<BattlefieldKeySkillUseSnapshot>();
+    private CachedRuleEntry[] cachedRuleEntries = Array.Empty<CachedRuleEntry>();
+    private IReadOnlyList<FrontlineKeySkillRuleSnapshot>? cachedRuleSource;
+    private bool cachedHasHookEvents;
+    private bool cachedHasChatEvents;
+    private long lastCombatEventVersion = -1;
+    private int lastRawLineCount = -1;
     private bool disposed;
 
     public FrontlineKeySkillEventReader(
@@ -79,6 +86,11 @@ public sealed class FrontlineKeySkillEventReader : IDisposable
         }
 
         Prune(now);
+        if (lastCombatEventVersion >= -1)
+        {
+            RefreshCachedEvents(knowledge, now);
+            return BuildProjectedSnapshot(knowledge, now);
+        }
 
         var hookEvents = BuildHookEvents(knowledge, now);
         var chatEvents = BuildChatEvents(knowledge, now);
@@ -115,10 +127,11 @@ public sealed class FrontlineKeySkillEventReader : IDisposable
         out FrontlineKeySkillRuleSnapshot rule)
     {
         rule = default;
-        if (knowledge.KeySkillRules.Length == 0)
+        var rules = GetRuleEntries(knowledge.KeySkillRules);
+        if (rules.Length == 0)
             return false;
 
-        rule = FindMatchingSkillRule(knowledge.KeySkillRules, item.ActionName, item.EvidenceText);
+        rule = FindMatchingSkillRule(rules, item.ActionName, item.EvidenceText);
         return !string.IsNullOrWhiteSpace(rule.SkillName);
     }
 
@@ -131,6 +144,13 @@ public sealed class FrontlineKeySkillEventReader : IDisposable
         chatGui.ChatMessage -= OnChatMessage;
         rawLines.Clear();
         lastSeenByKey.Clear();
+        cachedMergedEvents = Array.Empty<BattlefieldKeySkillUseSnapshot>();
+        cachedRuleEntries = Array.Empty<CachedRuleEntry>();
+        cachedRuleSource = null;
+        cachedHasHookEvents = false;
+        cachedHasChatEvents = false;
+        lastCombatEventVersion = -1;
+        lastRawLineCount = -1;
     }
 
     private void OnChatMessage(IHandleableChatMessage message)
@@ -160,18 +180,113 @@ public sealed class FrontlineKeySkillEventReader : IDisposable
         }
     }
 
-    private BattlefieldKeySkillUseSnapshot[] BuildHookEvents(FrontlineKnowledgeSnapshot knowledge, long now)
+    private void RefreshCachedEvents(FrontlineKnowledgeSnapshot knowledge, long now)
     {
-        if (knowledge.KeySkillRules.Length == 0)
+        var combatEventVersion = combatEventService.SnapshotVersion;
+        var rawLineCount = rawLines.Count;
+        var rulesChanged = !ReferenceEquals(cachedRuleSource, knowledge.KeySkillRules);
+        var rules = GetRuleEntries(knowledge.KeySkillRules);
+        if (!rulesChanged
+            && combatEventVersion == lastCombatEventVersion
+            && rawLineCount == lastRawLineCount)
+        {
+            return;
+        }
+
+        var hookEvents = BuildHookEvents(rules, now);
+        var chatEvents = BuildChatEvents(rules, now);
+        cachedMergedEvents = MergeRecentEvents(hookEvents, chatEvents);
+        cachedHasHookEvents = hookEvents.Length > 0;
+        cachedHasChatEvents = chatEvents.Length > 0;
+        lastCombatEventVersion = combatEventService.SnapshotVersion;
+        lastRawLineCount = rawLines.Count;
+    }
+
+    private BattlefieldKeySkillLogEventSituationSnapshot BuildProjectedSnapshot(FrontlineKnowledgeSnapshot knowledge, long now)
+    {
+        var recent = ProjectRecentEvents(now, out var windowCount);
+        return new BattlefieldKeySkillLogEventSituationSnapshot
+        {
+            IsAvailable = recent.Length > 0,
+            RecentEvents = recent,
+            RecentEventCount = windowCount,
+            SourceText = BuildSourceText(),
+            SummaryText = BuildSummaryText(knowledge.KeySkillRules.Length, recent.Length, windowCount)
+        };
+    }
+
+    private BattlefieldKeySkillUseSnapshot[] ProjectRecentEvents(long now, out int windowCount)
+    {
+        if (cachedMergedEvents.Length == 0)
+        {
+            windowCount = 0;
+            return Array.Empty<BattlefieldKeySkillUseSnapshot>();
+        }
+
+        var projected = new List<BattlefieldKeySkillUseSnapshot>(Math.Min(cachedMergedEvents.Length, 32));
+        windowCount = 0;
+        foreach (var item in cachedMergedEvents)
+        {
+            var ageMs = Math.Max(0, now - item.ObservedAtTicks);
+            if (ageMs > RecentWindowMs)
+                continue;
+
+            projected.Add(item with { AgeMs = ageMs });
+            windowCount++;
+            if (projected.Count >= 32)
+                break;
+        }
+
+        return projected.Count == 0 ? Array.Empty<BattlefieldKeySkillUseSnapshot>() : projected.ToArray();
+    }
+
+    private string BuildSourceText()
+        => cachedHasHookEvents switch
+        {
+            true when cachedHasChatEvents => "战斗事件Hook/IChatGui兜底",
+            true => "战斗事件Hook",
+            _ when cachedHasChatEvents => "IChatGui战斗日志",
+            _ => "战斗事件Hook/IChatGui"
+        };
+
+    private static string BuildSummaryText(int ruleCount, int recentCount, int windowCount)
+        => ruleCount == 0
+            ? "关键技能规则尚未加载"
+            : recentCount == 0
+                ? "尚未捕获到关键技能使用事件"
+                : $"近30秒捕获 {windowCount} 条关键技能事件，当前缓存 {recentCount} 条";
+
+    private CachedRuleEntry[] GetRuleEntries(IReadOnlyList<FrontlineKeySkillRuleSnapshot> rules)
+    {
+        if (ReferenceEquals(cachedRuleSource, rules))
+            return cachedRuleEntries;
+
+        cachedRuleSource = rules;
+        cachedRuleEntries = BuildCachedRuleEntries(rules);
+        return cachedRuleEntries;
+    }
+
+    private BattlefieldKeySkillUseSnapshot[] BuildHookEvents(FrontlineKnowledgeSnapshot knowledge, long now)
+        => BuildHookEvents(GetRuleEntries(knowledge.KeySkillRules), now);
+
+    private BattlefieldKeySkillUseSnapshot[] BuildChatEvents(FrontlineKnowledgeSnapshot knowledge, long now)
+        => BuildChatEvents(GetRuleEntries(knowledge.KeySkillRules), now);
+
+    private BattlefieldKeySkillUseSnapshot[] BuildHookEvents(CachedRuleEntry[] rules, long now)
+    {
+        if (rules.Length == 0)
             return Array.Empty<BattlefieldKeySkillUseSnapshot>();
 
         var events = combatEventService.GetRecentEvents(now, RecentWindowMs);
         if (events.Length == 0)
             return Array.Empty<BattlefieldKeySkillUseSnapshot>();
 
-        var actionEffects = events
-            .Where(item => item.Kind == CombatEventKind.ActionEffect)
-            .ToArray();
+        var actionEffects = new List<CombatActionEvent>(events.Length);
+        foreach (var item in events)
+        {
+            if (item.Kind == CombatEventKind.ActionEffect)
+                actionEffects.Add(item);
+        }
         var results = new List<BattlefieldKeySkillUseSnapshot>(events.Length);
 
         foreach (var item in events)
@@ -179,7 +294,7 @@ public sealed class FrontlineKeySkillEventReader : IDisposable
             if (item.Kind == CombatEventKind.StartCast && HasConfirmedActionEffect(actionEffects, item))
                 continue;
 
-            if (!TryCreateHookEvent(item, knowledge, now, out var snapshot))
+            if (!TryCreateHookEvent(item, rules, now, out var snapshot))
                 continue;
 
             results.Add(snapshot);
@@ -188,9 +303,9 @@ public sealed class FrontlineKeySkillEventReader : IDisposable
         return results.ToArray();
     }
 
-    private BattlefieldKeySkillUseSnapshot[] BuildChatEvents(FrontlineKnowledgeSnapshot knowledge, long now)
+    private BattlefieldKeySkillUseSnapshot[] BuildChatEvents(CachedRuleEntry[] rules, long now)
     {
-        if (knowledge.KeySkillRules.Length == 0)
+        if (rules.Length == 0)
             return Array.Empty<BattlefieldKeySkillUseSnapshot>();
 
         if (rawLines.Count == 0)
@@ -199,7 +314,7 @@ public sealed class FrontlineKeySkillEventReader : IDisposable
         var results = new List<BattlefieldKeySkillUseSnapshot>(Math.Min(rawLines.Count, 32));
         for (var i = rawLines.Count - 1; i >= 0 && results.Count < 32; i--)
         {
-            if (TryCreateChatEvent(rawLines[i], knowledge, now, out var item) && item.ObservedAtTicks > 0)
+            if (TryCreateChatEvent(rawLines[i], rules, now, out var item) && item.ObservedAtTicks > 0)
                 results.Add(item);
         }
 
@@ -210,12 +325,17 @@ public sealed class FrontlineKeySkillEventReader : IDisposable
         IReadOnlyList<BattlefieldKeySkillUseSnapshot> hookEvents,
         IReadOnlyList<BattlefieldKeySkillUseSnapshot> chatEvents)
     {
-        var candidates = hookEvents
-            .Select(item => new MergedEventCandidate(item, 0))
-            .Concat(chatEvents.Select(item => new MergedEventCandidate(item, 1)))
-            .OrderByDescending(item => item.Snapshot.ObservedAtTicks)
-            .ThenBy(item => item.Priority)
-            .ToArray();
+        var candidates = new List<MergedEventCandidate>(hookEvents.Count + chatEvents.Count);
+        foreach (var item in hookEvents)
+            candidates.Add(new MergedEventCandidate(item, 0));
+        foreach (var item in chatEvents)
+            candidates.Add(new MergedEventCandidate(item, 1));
+
+        candidates.Sort(static (left, right) =>
+        {
+            var observedCompare = right.Snapshot.ObservedAtTicks.CompareTo(left.Snapshot.ObservedAtTicks);
+            return observedCompare != 0 ? observedCompare : left.Priority.CompareTo(right.Priority);
+        });
 
         var merged = new List<BattlefieldKeySkillUseSnapshot>(32);
         foreach (var candidate in candidates)
@@ -233,12 +353,12 @@ public sealed class FrontlineKeySkillEventReader : IDisposable
 
     private bool TryCreateHookEvent(
         CombatActionEvent item,
-        FrontlineKnowledgeSnapshot knowledge,
+        CachedRuleEntry[] rules,
         long now,
         out BattlefieldKeySkillUseSnapshot snapshot)
     {
         snapshot = default;
-        var rule = FindMatchingSkillRule(knowledge.KeySkillRules, item.ActionName, item.EvidenceText);
+        var rule = FindMatchingSkillRule(rules, item.ActionName, item.EvidenceText);
         if (string.IsNullOrWhiteSpace(rule.SkillName))
             return false;
 
@@ -271,12 +391,12 @@ public sealed class FrontlineKeySkillEventReader : IDisposable
 
     private bool TryCreateChatEvent(
         RawCombatLine line,
-        FrontlineKnowledgeSnapshot knowledge,
+        CachedRuleEntry[] rules,
         long now,
         out BattlefieldKeySkillUseSnapshot snapshot)
     {
         snapshot = default;
-        if (knowledge.KeySkillRules.Length == 0)
+        if (rules.Length == 0)
             return false;
 
         var actor = line.Sender;
@@ -294,7 +414,7 @@ public sealed class FrontlineKeySkillEventReader : IDisposable
             break;
         }
 
-        var rule = FindMatchingSkillRule(knowledge.KeySkillRules, skillText, line.Text);
+        var rule = FindMatchingSkillRule(rules, skillText, line.Text);
         if (string.IsNullOrWhiteSpace(rule.SkillName))
             return false;
 
@@ -402,16 +522,39 @@ public sealed class FrontlineKeySkillEventReader : IDisposable
         return false;
     }
 
+    private static CachedRuleEntry[] BuildCachedRuleEntries(IReadOnlyList<FrontlineKeySkillRuleSnapshot> rules)
+        => rules
+            .OrderByDescending(rule => rule.SkillName.Length)
+            .Select(rule =>
+            {
+                var aliases = BuildSkillAliases(rule.SkillName)
+                    .Select(NormalizeForMatch)
+                    .Where(alias => alias.Length > 0)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+                return new CachedRuleEntry(rule, aliases);
+            })
+            .Where(entry => entry.Aliases.Length > 0)
+            .ToArray();
+
     private static FrontlineKeySkillRuleSnapshot FindMatchingSkillRule(
-        IReadOnlyList<FrontlineKeySkillRuleSnapshot> rules,
+        IReadOnlyList<CachedRuleEntry> rules,
         string skillText,
         string fullText)
     {
-        foreach (var rule in rules.OrderByDescending(rule => rule.SkillName.Length))
+        var normalizedSkillText = NormalizeForMatch(skillText);
+        var normalizedFullText = NormalizeForMatch(fullText);
+
+        foreach (var entry in rules)
         {
-            var aliases = BuildSkillAliases(rule.SkillName);
-            if (aliases.Any(alias => ContainsNormalized(skillText, alias) || ContainsNormalized(fullText, alias)))
-                return rule;
+            foreach (var alias in entry.Aliases)
+            {
+                if (normalizedSkillText.Contains(alias, StringComparison.OrdinalIgnoreCase)
+                    || normalizedFullText.Contains(alias, StringComparison.OrdinalIgnoreCase))
+                {
+                    return entry.Rule;
+                }
+            }
         }
 
         return default;
@@ -576,6 +719,10 @@ public sealed class FrontlineKeySkillEventReader : IDisposable
         XivChatType LogKind,
         XivChatRelationKind SourceKind,
         XivChatRelationKind TargetKind);
+
+    private readonly record struct CachedRuleEntry(
+        FrontlineKeySkillRuleSnapshot Rule,
+        string[] Aliases);
 
     private readonly record struct MergedEventCandidate(
         BattlefieldKeySkillUseSnapshot Snapshot,

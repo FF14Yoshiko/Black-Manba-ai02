@@ -27,6 +27,8 @@ public sealed class CommandOverlayService : IDisposable
     private BattlefieldCommandSnapshot? lastPublishedBattleCommand;
     private BattlefieldPriorityTargetSnapshot? pinnedObjectiveTarget;
     private long pinnedObjectiveUpdatedAtTicks = -1;
+    private CommandOverlayDirectiveDisplaySnapshot? heldAiDirectiveDisplay;
+    private long heldAiDirectiveTicks = -1;
     private IFontHandle? objectiveFontHandle;
     private IFontHandle? battleFontHandle;
     private IFontHandle? threatFontHandle;
@@ -71,6 +73,8 @@ public sealed class CommandOverlayService : IDisposable
         lastPublishedBattleCommand = null;
         pinnedObjectiveTarget = null;
         pinnedObjectiveUpdatedAtTicks = -1;
+        heldAiDirectiveDisplay = null;
+        heldAiDirectiveTicks = -1;
         DisposeOverlayFonts();
     }
 
@@ -97,13 +101,22 @@ public sealed class CommandOverlayService : IDisposable
         CommandOverlayConfiguration config,
         out OverlayDisplayContent content)
     {
-        _ = now;
-        _ = config;
-
-        content = new OverlayDisplayContent(
+        var directives = new CommandOverlayDirectiveDisplaySnapshot(
             ResolveOverlayPrimaryCommandText(snapshot.Decision),
             BuildOverlayCurrentActionText(snapshot.Decision),
-            BuildOverlayThreatText(snapshot));
+            CommandOverlayAiDisplayPolicy.IsAiLead(snapshot.Decision));
+        directives = CommandOverlayAiDisplayPolicy.ResolveDisplay(
+            directives,
+            now,
+            config.AiLeadHoldSeconds,
+            ref heldAiDirectiveDisplay,
+            ref heldAiDirectiveTicks);
+
+        content = new OverlayDisplayContent(
+            directives.PrimaryCommandLine,
+            directives.CurrentActionLine,
+            BuildOverlayThreatText(snapshot),
+            directives.IsAiLead);
         return true;
     }
 
@@ -112,16 +125,16 @@ public sealed class CommandOverlayService : IDisposable
         var commands = decision.CommandSituation;
         if (commands.PrimaryCommand.HasValue && !string.IsNullOrWhiteSpace(commands.PrimaryCommand.Value.CommandText))
         {
-            return SimplifyOverlayCommandText(commands.PrimaryCommand.Value);
+            return StripOverlayTimingDetails(SimplifyOverlayCommandText(commands.PrimaryCommand.Value));
         }
         if (commands.Publish.ShouldAnnounce && !string.IsNullOrWhiteSpace(commands.Publish.SpeakText))
-            return CleanOverlayDirectiveText(commands.Publish.SpeakText);
+            return StripOverlayTimingDetails(CleanOverlayDirectiveText(commands.Publish.SpeakText));
         if (decision.PrimaryAction.HasValue && !string.IsNullOrWhiteSpace(decision.PrimaryAction.Value.Text))
-            return SimplifyOverlayActionText(decision.PrimaryAction.Value);
+            return StripOverlayTimingDetails(SimplifyOverlayActionText(decision.PrimaryAction.Value));
         if (commands.PrimaryAction.HasValue && !string.IsNullOrWhiteSpace(commands.PrimaryAction.Value.Text))
-            return SimplifyOverlayActionText(commands.PrimaryAction.Value);
+            return StripOverlayTimingDetails(SimplifyOverlayActionText(commands.PrimaryAction.Value));
         if (!string.IsNullOrWhiteSpace(decision.RecommendedAction))
-            return CleanOverlayDirectiveText(decision.RecommendedAction);
+            return StripOverlayTimingDetails(CleanOverlayDirectiveText(decision.RecommendedAction));
 
         return "暂无主指令，主团跟我压进";
     }
@@ -129,13 +142,13 @@ public sealed class CommandOverlayService : IDisposable
     private static string BuildOverlayCurrentActionText(BattlefieldDecisionSnapshot decision)
     {
         if (decision.PrimaryAction.HasValue && !string.IsNullOrWhiteSpace(decision.PrimaryAction.Value.Text))
-            return SimplifyOverlayActionText(decision.PrimaryAction.Value);
+            return StripOverlayTimingDetails(SimplifyOverlayActionText(decision.PrimaryAction.Value));
         if (decision.PublishedAction.HasValue && !string.IsNullOrWhiteSpace(decision.PublishedAction.Value.Text))
-            return SimplifyOverlayActionText(decision.PublishedAction.Value);
+            return StripOverlayTimingDetails(SimplifyOverlayActionText(decision.PublishedAction.Value));
         if (decision.CommandSituation.PrimaryAction.HasValue && !string.IsNullOrWhiteSpace(decision.CommandSituation.PrimaryAction.Value.Text))
-            return SimplifyOverlayActionText(decision.CommandSituation.PrimaryAction.Value);
+            return StripOverlayTimingDetails(SimplifyOverlayActionText(decision.CommandSituation.PrimaryAction.Value));
         if (!string.IsNullOrWhiteSpace(decision.RecommendedAction))
-            return CleanOverlayDirectiveText(decision.RecommendedAction);
+            return StripOverlayTimingDetails(CleanOverlayDirectiveText(decision.RecommendedAction));
 
         return "战场态势不足，继续寻找目标";
     }
@@ -243,6 +256,20 @@ public sealed class CommandOverlayService : IDisposable
     {
         var value = SanitizeOverlayDirectiveText(text);
         return PreserveOverlayText(value, OverlayDisplayMaxChars);
+    }
+
+    private static string StripOverlayTimingDetails(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return string.Empty;
+
+        var value = text.Trim();
+        value = Regex.Replace(value, @"[，,；;]?\s*(?:预计|倒计时|剩余|可契约时间|契约时间|可争夺时间)\s*[^，,；;]*", string.Empty);
+        value = Regex.Replace(value, @"[，,；;]?\s*(?:可契约|可争夺)\s*\d{1,2}:\d{2}", string.Empty);
+        value = Regex.Replace(value, @"[，,；;]?\s*(?:距离\s*)?(?:可契约|可争夺)?状态还有[:：]?\s*\d{1,2}:\d{2}", string.Empty);
+        value = Regex.Replace(value, @"[，,；;]?\s*(?:还有|剩余)[:：]?\s*\d{1,2}:\d{2}", string.Empty);
+        value = Regex.Replace(value, @"\s+", " ");
+        return PreserveOverlayText(NormalizeOverlayDirectiveText(value), OverlayDisplayMaxChars);
     }
 
     private static string SanitizeOverlayDirectiveText(string? text)
@@ -539,7 +566,7 @@ public sealed class CommandOverlayService : IDisposable
         if (id.StartsWith("doctrine:spread-precast", StringComparison.Ordinal))
             return "横向散开，等技能交完";
         if (id.StartsWith("doctrine:interrupt-touch", StringComparison.Ordinal))
-            return BuildHudTargetText("先断 ", target, "，别让白拿", "先断摸点，别让白拿");
+            return BuildHudTargetText("先去摸 ", target, "，别让白拿", "先去摸点，别让白拿");
         if (id.StartsWith("doctrine:cover-touch", StringComparison.Ordinal))
             return BuildHudTargetText("前压掩护 ", target, string.Empty, "前压掩护摸点");
         if (id.StartsWith("doctrine:big-ice-all-in", StringComparison.Ordinal))
@@ -568,7 +595,7 @@ public sealed class CommandOverlayService : IDisposable
         if (id.StartsWith("tempo:stop-after-profit", StringComparison.Ordinal))
             return "收益够了，出夹角";
         if (id.StartsWith("tempo:stop-farming-score", StringComparison.Ordinal))
-            return BuildHudTargetText("战意够了，去断 ", target, string.Empty, "战意够了，转去断分");
+            return BuildHudTargetText("转去 ", target, string.Empty, "转去下一目标点");
         if (id.StartsWith("tempo:opening-probe", StringComparison.Ordinal))
             return "开局接一波，留撤退线";
         if (id.StartsWith("tempo:early-battle-high-farm", StringComparison.Ordinal))
@@ -1077,6 +1104,9 @@ public sealed class CommandOverlayService : IDisposable
 
     private static string BuildCompactCommandText(BattlefieldCommandSnapshot command, string fallbackTarget)
     {
+        if (command.Id.StartsWith("tempo:stop-farming-score", StringComparison.Ordinal))
+            return CompactOverlayText(command.CommandText, 24);
+
         var target = ShortTargetName(command.TargetName, 10);
         if (string.IsNullOrWhiteSpace(target))
             target = ShortTargetName(fallbackTarget, 10);
@@ -1405,11 +1435,16 @@ public sealed class CommandOverlayService : IDisposable
         if (ImGui.Begin("##ai02CommandOverlay", flags))
         {
             var width = MathF.Max(120f, config.Width - 32f);
-            var textColor = new Vector4(config.TextColorR, config.TextColorG, config.TextColorB, 1f);
+            var defaultTextColor = new Vector4(config.TextColorR, config.TextColorG, config.TextColorB, 1f);
+            var aiTextColor = new Vector4(config.AiTextColorR, config.AiTextColorG, config.AiTextColorB, 1f);
+            var textColor = content.IsAiLead ? aiTextColor : defaultTextColor;
+            var currentActionColor = content.IsAiLead
+                ? BlendColor(aiTextColor, new Vector4(0.60f, 1f, 0.84f, 1f), 0.34f)
+                : new Vector4(0.48f, 0.90f, 0.62f, 1f);
             var strokeColor = new Vector4(config.StrokeColorR, config.StrokeColorG, config.StrokeColorB, 1f);
             DrawWrappedText(content.PrimaryCommandLine, Math.Clamp(config.FontScale * 0.72f, 1.0f, 3.2f), width, textColor, strokeColor, config.ShowStroke, objectiveFontHandle);
             ImGui.SetCursorScreenPos(ImGui.GetCursorScreenPos() + new Vector2(0f, 2f));
-            DrawWrappedText(content.CurrentActionLine, Math.Clamp(config.FontScale * 0.44f, 0.76f, 2.0f), width, new Vector4(0.48f, 0.90f, 0.62f, 1f), strokeColor, config.ShowStroke, threatFontHandle);
+            DrawWrappedText(content.CurrentActionLine, Math.Clamp(config.FontScale * 0.44f, 0.76f, 2.0f), width, currentActionColor, strokeColor, config.ShowStroke, threatFontHandle);
             ImGui.SetCursorScreenPos(ImGui.GetCursorScreenPos() + new Vector2(0f, 2f));
             DrawWrappedText(content.ThreatLine, Math.Clamp(config.FontScale * 0.38f, 0.70f, 1.8f), width, new Vector4(1f, 0.42f, 0.30f, 1f), strokeColor, config.ShowStroke, battleFontHandle);
         }
@@ -1483,6 +1518,16 @@ public sealed class CommandOverlayService : IDisposable
         ImGui.PopTextWrapPos();
     }
 
+    private static Vector4 BlendColor(Vector4 source, Vector4 target, float amount)
+    {
+        amount = Math.Clamp(amount, 0f, 1f);
+        return new Vector4(
+            source.X + (target.X - source.X) * amount,
+            source.Y + (target.Y - source.Y) * amount,
+            source.Z + (target.Z - source.Z) * amount,
+            source.W + (target.W - source.W) * amount);
+    }
+
     private void EnsureOverlayFonts(CommandOverlayConfiguration config)
     {
         var basePx = UiBuilder.DefaultFontSizePx;
@@ -1528,5 +1573,6 @@ public sealed class CommandOverlayService : IDisposable
     private readonly record struct OverlayDisplayContent(
         string PrimaryCommandLine,
         string CurrentActionLine,
-        string ThreatLine);
+        string ThreatLine,
+        bool IsAiLead);
 }

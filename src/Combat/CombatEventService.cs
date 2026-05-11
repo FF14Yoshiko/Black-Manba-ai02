@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.InteropServices;
+using System.Threading;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Plugin.Services;
@@ -27,6 +28,7 @@ public sealed class CombatEventService : IDisposable
     private readonly Dictionary<string, long> lastSeenByKey = new(StringComparer.Ordinal);
     private readonly Dictionary<uint, string> actionNameCache = new();
     private long lastPruneTicks = -1;
+    private long snapshotVersion;
     private bool captureEnabled;
     private bool disposed;
 
@@ -45,6 +47,8 @@ public sealed class CombatEventService : IDisposable
         actionEffectHook.OnRaw += HandleActionEffect;
         startCastHook.OnRaw += HandleStartCast;
     }
+
+    public long SnapshotVersion => Interlocked.Read(ref snapshotVersion);
 
     public CombatActionEvent[] GetRecentEvents(long now, long maxAgeMs = EventTtlMs)
     {
@@ -81,6 +85,7 @@ public sealed class CombatEventService : IDisposable
             events.Clear();
             lastSeenByKey.Clear();
             lastPruneTicks = -1;
+            Interlocked.Increment(ref snapshotVersion);
         }
     }
 
@@ -97,6 +102,7 @@ public sealed class CombatEventService : IDisposable
         events.Clear();
         lastSeenByKey.Clear();
         actionNameCache.Clear();
+        Interlocked.Increment(ref snapshotVersion);
     }
 
     private unsafe void HandleActionEffect(
@@ -189,6 +195,7 @@ public sealed class CombatEventService : IDisposable
                 $"技能#{header.ActionId} 动画#{header.ActionAnimationId} 目标{targets.Count}个"));
             TrimRecentEvents();
             Prune(now, force: false);
+            Interlocked.Increment(ref snapshotVersion);
         }
         catch (Exception ex)
         {
@@ -244,6 +251,7 @@ public sealed class CombatEventService : IDisposable
                 $"技能#{actionId} 读条{cast.CastTime:0.0}s 目标#{cast.TargetId}"));
             TrimRecentEvents();
             Prune(now, force: false);
+            Interlocked.Increment(ref snapshotVersion);
         }
         catch (Exception ex)
         {
@@ -266,13 +274,19 @@ public sealed class CombatEventService : IDisposable
             return;
 
         lastPruneTicks = now;
-        events.RemoveAll(item => now - item.ObservedAtTicks > EventTtlMs);
+        var changed = events.RemoveAll(item => now - item.ObservedAtTicks > EventTtlMs) > 0;
         TrimRecentEvents();
         foreach (var key in lastSeenByKey.Keys.ToArray())
         {
             if (now - lastSeenByKey[key] > EventTtlMs)
+            {
                 lastSeenByKey.Remove(key);
+                changed = true;
+            }
         }
+
+        if (changed)
+            Interlocked.Increment(ref snapshotVersion);
     }
 
     private void TrimRecentEvents()

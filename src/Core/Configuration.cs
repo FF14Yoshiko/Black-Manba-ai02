@@ -11,7 +11,7 @@ namespace ai02;
 [Serializable]
 public class Configuration : IPluginConfiguration
 {
-    private const int CurrentVersion = 24;
+    private const int CurrentVersion = 25;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
@@ -23,7 +23,6 @@ public class Configuration : IPluginConfiguration
 
     public RadarConfiguration Radar { get; set; } = new();
     public FloatingButtonConfiguration FloatingButton { get; set; } = new();
-    public SightDistanceConfiguration SightDistance { get; set; } = new();
     public LimitBreakConfiguration LimitBreak { get; set; } = new();
     public CommandOverlayConfiguration CommandOverlay { get; set; } = new();
     public BattlefieldAnnouncementConfiguration Announcement { get; set; } = new();
@@ -53,9 +52,10 @@ public class Configuration : IPluginConfiguration
 
     public void ApplyImportedConfiguration(Configuration imported)
     {
+        var existingApiKey = LlmDecision?.ApiKey ?? string.Empty;
+
         Radar = imported.Radar ?? new RadarConfiguration();
         FloatingButton = imported.FloatingButton ?? new FloatingButtonConfiguration();
-        SightDistance = imported.SightDistance ?? new SightDistanceConfiguration();
         LimitBreak = imported.LimitBreak ?? new LimitBreakConfiguration();
         CommandOverlay = imported.CommandOverlay ?? new CommandOverlayConfiguration();
         Announcement = imported.Announcement ?? new BattlefieldAnnouncementConfiguration();
@@ -66,6 +66,8 @@ public class Configuration : IPluginConfiguration
         AdvancedTactics = imported.AdvancedTactics ?? new AdvancedTacticsCalibrationConfiguration();
         Performance = imported.Performance ?? new PerformanceConfiguration();
         LlmDecision = imported.LlmDecision ?? new LlmDecisionConfiguration();
+        if (string.IsNullOrWhiteSpace(LlmDecision.ApiKey))
+            LlmDecision.ApiKey = existingApiKey;
         Version = imported.Version;
 
         NormalizeAndMigrate();
@@ -122,10 +124,21 @@ public class Configuration : IPluginConfiguration
             PluginVersion = typeof(Plugin).Assembly.GetName().Version?.ToString() ?? string.Empty,
             ConfigurationVersion = Version,
             ExportedAtUtc = DateTimeOffset.UtcNow,
-            Configuration = this
+            Configuration = CreateExportConfiguration()
         };
 
         return JsonSerializer.Serialize(document, JsonOptions);
+    }
+
+    private Configuration CreateExportConfiguration()
+    {
+        var clone = JsonSerializer.Deserialize<Configuration>(
+            JsonSerializer.Serialize(this, JsonOptions),
+            JsonOptions) ?? new Configuration();
+
+        clone.LlmDecision ??= new LlmDecisionConfiguration();
+        clone.LlmDecision.ApiKey = string.Empty;
+        return clone;
     }
 
     public void ApplyLowImpactDefaults()
@@ -158,7 +171,6 @@ public class Configuration : IPluginConfiguration
         Radar.MapRadar = false;
         Radar.FieldMarkers = false;
         Radar.TargetMarkers = false;
-        Radar.AutoMarkFocusTarget = false;
         Radar.OnlyDisplayDot = true;
         Radar.ShowNames = false;
         Radar.ShowJobIcons = false;
@@ -233,6 +245,11 @@ public class Configuration : IPluginConfiguration
             LlmDecision ??= new LlmDecisionConfiguration();
             migrated = true;
         }
+        if (Version < 25)
+        {
+            LlmDecision ??= new LlmDecisionConfiguration();
+            migrated = true;
+        }
 
         ScoreReader.Normalize();
         CommandOverlay.Normalize();
@@ -256,7 +273,6 @@ public class Configuration : IPluginConfiguration
     {
         Radar ??= new RadarConfiguration();
         FloatingButton ??= new FloatingButtonConfiguration();
-        SightDistance ??= new SightDistanceConfiguration();
         LimitBreak ??= new LimitBreakConfiguration();
         CommandOverlay ??= new CommandOverlayConfiguration();
         Announcement ??= new BattlefieldAnnouncementConfiguration();
@@ -319,6 +335,7 @@ public class LlmDecisionConfiguration
     private const int PreviousDefaultMinIntervalSeconds = 10;
     private const int PreviousDefaultSameSituationCooldownSeconds = 15;
     private const int PreviousDefaultFreshDecisionSeconds = 55;
+    private const int PreviousDefaultRoutinePulseIntervalSeconds = 20;
     private const int RelaxedDefaultMinIntervalSeconds = 8;
     private const int RelaxedDefaultSameSituationCooldownSeconds = 14;
     private const int LegacyHighDefaultMinIntervalSeconds = 18;
@@ -332,6 +349,8 @@ public class LlmDecisionConfiguration
     public int RequestTimeoutMs { get; set; } = 4500;
     public int MinIntervalSeconds { get; set; } = 5;
     public int SameSituationCooldownSeconds { get; set; } = 8;
+    public bool RoutinePulseEnabled { get; set; } = true;
+    public int RoutinePulseIntervalSeconds { get; set; } = 25;
     public int FreshDecisionSeconds { get; set; } = 40;
     public int MaxContextTurns { get; set; } = 6;
     public bool IncludeDebugPayload { get; set; } = true;
@@ -354,11 +373,14 @@ public class LlmDecisionConfiguration
             || SameSituationCooldownSeconds == RelaxedDefaultSameSituationCooldownSeconds
             || SameSituationCooldownSeconds == LegacyHighDefaultSameSituationCooldownSeconds)
             SameSituationCooldownSeconds = 8;
+        if (RoutinePulseIntervalSeconds == PreviousDefaultRoutinePulseIntervalSeconds)
+            RoutinePulseIntervalSeconds = 25;
         if (FreshDecisionSeconds == PreviousDefaultFreshDecisionSeconds)
             FreshDecisionSeconds = 40;
         RequestTimeoutMs = Math.Clamp(RequestTimeoutMs, 1500, 15000);
         MinIntervalSeconds = Math.Clamp(MinIntervalSeconds, 3, 120);
         SameSituationCooldownSeconds = Math.Clamp(SameSituationCooldownSeconds, 5, 180);
+        RoutinePulseIntervalSeconds = Math.Clamp(RoutinePulseIntervalSeconds, 10, 180);
         FreshDecisionSeconds = Math.Clamp(FreshDecisionSeconds, 10, 180);
         MaxContextTurns = Math.Clamp(MaxContextTurns, 0, 12);
     }
@@ -510,9 +532,13 @@ public class CommandOverlayConfiguration
     public float Height { get; set; } = 366.214f;
     public float FontScale { get; set; } = 3.002f;
     public int PublishedHoldSeconds { get; set; } = 5;
+    public int AiLeadHoldSeconds { get; set; } = 6;
     public float TextColorR { get; set; } = 1f;
     public float TextColorG { get; set; } = 0.86f;
     public float TextColorB { get; set; } = 0.22f;
+    public float AiTextColorR { get; set; } = 0.35f;
+    public float AiTextColorG { get; set; } = 0.82f;
+    public float AiTextColorB { get; set; } = 1f;
     public float StrokeColorR { get; set; }
     public float StrokeColorG { get; set; }
     public float StrokeColorB { get; set; }
@@ -526,9 +552,13 @@ public class CommandOverlayConfiguration
         Height = Math.Clamp(Height, 80f, 900f);
         FontScale = Math.Clamp(FontScale, 0.8f, 5f);
         PublishedHoldSeconds = Math.Clamp(PublishedHoldSeconds, 1, 20);
+        AiLeadHoldSeconds = Math.Clamp(AiLeadHoldSeconds, 0, 20);
         TextColorR = Math.Clamp(TextColorR, 0f, 1f);
         TextColorG = Math.Clamp(TextColorG, 0f, 1f);
         TextColorB = Math.Clamp(TextColorB, 0f, 1f);
+        AiTextColorR = Math.Clamp(AiTextColorR, 0f, 1f);
+        AiTextColorG = Math.Clamp(AiTextColorG, 0f, 1f);
+        AiTextColorB = Math.Clamp(AiTextColorB, 0f, 1f);
         StrokeColorR = Math.Clamp(StrokeColorR, 0f, 1f);
         StrokeColorG = Math.Clamp(StrokeColorG, 0f, 1f);
         StrokeColorB = Math.Clamp(StrokeColorB, 0f, 1f);
@@ -700,7 +730,6 @@ public class RadarConfiguration
     public bool MapRadar { get; set; } = true;
     public bool FieldMarkers { get; set; }
     public bool TargetMarkers { get; set; }
-    public bool AutoMarkFocusTarget { get; set; }
     public bool OutsideFrontline { get; set; }
     public bool HideFriendlyCharacters { get; set; } = true;
     public bool OnlyDisplayDot { get; set; }
@@ -802,39 +831,3 @@ public class BattlefieldAnnouncementConfiguration
     public bool ShowDebugInfo { get; set; }
 }
 
-[Serializable]
-public class SightDistanceConfiguration
-{
-    public bool Enabled { get; set; } = true;
-    public bool IgnoreCollision { get; set; } = true;
-    public float MaxDistance { get; set; } = 80f;
-    public float MinDistance { get; set; } = 0f;
-    public float MaxRotation { get; set; } = 1.569f;
-    public float MinRotation { get; set; } = -1.569f;
-    public float MaxFoV { get; set; } = 0.78f;
-    public float MinFoV { get; set; } = 0.69f;
-    public float FoV { get; set; } = 0.78f;
-
-    public void Normalize()
-    {
-        MaxDistance = Math.Clamp(MaxDistance, 1f, 80f);
-        MinDistance = Math.Clamp(MinDistance, 0f, MaxDistance);
-        MaxRotation = Math.Clamp(MaxRotation, MinRotation, 1.569f);
-        MinRotation = Math.Clamp(MinRotation, -1.569f, MaxRotation);
-        MaxFoV = Math.Clamp(MaxFoV, MinFoV, 3f);
-        MinFoV = Math.Clamp(MinFoV, 0.01f, MaxFoV);
-        FoV = Math.Clamp(FoV, MinFoV, MaxFoV);
-    }
-
-    public void ResetToRecommendedDefaults()
-    {
-        MaxDistance = 80f;
-        MinDistance = 0f;
-        MaxRotation = 1.569f;
-        MinRotation = -1.569f;
-        MaxFoV = 0.78f;
-        MinFoV = 0.69f;
-        FoV = 0.78f;
-        IgnoreCollision = true;
-    }
-}

@@ -211,7 +211,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
             return "AI 大决策未启用，先打开开关。";
         if (!snapshot.IsInFrontline)
             return "当前不在纷争前线内，手动测试请求未发送。";
-        if (!snapshot.Decision.IsAvailable)
+        if (!ResolveLocalDecision(snapshot).IsAvailable)
             return "本地决策层尚未形成，稍后再试。";
         if (requireOperatorNote && string.IsNullOrWhiteSpace(operatorNote))
             return "请先输入你想对 AI 说的话。";
@@ -413,7 +413,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
 
     private LlmGateResult EvaluateGate(BattlefieldSnapshot snapshot, long now, LlmDecisionConfiguration config)
     {
-        var decision = snapshot.Decision;
+        var decision = ResolveLocalDecision(snapshot);
         var score = snapshot.ScoreSituation;
         var time = snapshot.TimeSituation;
         var input = decision.DecisionQuality.InputReliability;
@@ -456,12 +456,13 @@ public sealed class LlmStrategicDecisionService : IDisposable
             && objectiveNearAndLowRisk
             && scoreBalanced)
         {
-            return BuildGate(
-                BattlefieldLlmDecisionNeedKind.RoutineStrategicPulse,
+            return BuildRoutinePulseGate(
                 "两家敌方交战较远，我方附近有低风险目标；允许 AI 作为常规战略采样补充判断",
                 44f,
                 snapshot,
-                enemyCenters);
+                enemyCenters,
+                now,
+                config);
         }
 
         if (objectiveNearAndLowRisk
@@ -469,12 +470,13 @@ public sealed class LlmStrategicDecisionService : IDisposable
             && !snapshot.TeamSituation.AdvancedTactics.IsThirdPartyPincerLikely
             && closestEnemyDistance > 190f)
         {
-            return BuildGate(
-                BattlefieldLlmDecisionNeedKind.RoutineStrategicPulse,
+            return BuildRoutinePulseGate(
                 "当前目标近、风险低、比分压力不高；允许 AI 参与常规局势采样",
                 40f,
                 snapshot,
-                enemyCenters);
+                enemyCenters,
+                now,
+                config);
         }
 
         if (IsEndgameConflict(score, time, out var endgameReason))
@@ -562,10 +564,49 @@ public sealed class LlmStrategicDecisionService : IDisposable
                 enemyCenters);
         }
 
-        return BuildGate(
-            BattlefieldLlmDecisionNeedKind.RoutineStrategicPulse,
+        return BuildRoutinePulseGate(
             "当前未命中特典型复杂局势，但仍允许 AI 参与常规战略采样",
             Math.Clamp(42f + scorePressure * 0.25f + (primary.HasValue ? 6f : 0f) + (closestEnemyDistance <= 220f ? 6f : 0f), 0f, 72f),
+            snapshot,
+            enemyCenters,
+            now,
+            config);
+    }
+
+    private LlmGateResult BuildRoutinePulseGate(
+        string reason,
+        float urgency,
+        BattlefieldSnapshot snapshot,
+        IReadOnlyList<AllianceCenter> enemyCenters,
+        long now,
+        LlmDecisionConfiguration config)
+    {
+        long lastRequest;
+        lock (sync)
+            lastRequest = lastRequestTicks;
+
+        var scheduling = LlmGateSchedulingPolicy.ApplyRoutinePulseGate(
+            BattlefieldLlmDecisionNeedKind.RoutineStrategicPulse,
+            config.RoutinePulseEnabled,
+            config.RoutinePulseIntervalSeconds,
+            lastRequest,
+            now);
+        if (!scheduling.ShouldRequest)
+            return LlmGateResult.None(scheduling.WaitReason);
+
+        var evaluation = LlmRoutinePulsePolicy.Evaluate(
+            BattlefieldLlmDecisionNeedKind.RoutineStrategicPulse,
+            config.RoutinePulseEnabled,
+            config.RoutinePulseIntervalSeconds,
+            lastRequest,
+            now);
+        if (!evaluation.IsDue)
+            return LlmGateResult.None($"鍥哄畾灞€鍐呴噰鏍锋湭鍒帮紝璺濈涓嬩竴娆″父瑙勬垬鐣ラ噰鏍疯繕鍓?{evaluation.RemainingSeconds} 绉?");
+
+        return BuildGate(
+            BattlefieldLlmDecisionNeedKind.RoutineStrategicPulse,
+            reason,
+            urgency,
             snapshot,
             enemyCenters);
     }
@@ -780,24 +821,8 @@ public sealed class LlmStrategicDecisionService : IDisposable
 
     private BattlefieldLlmStrategicDecisionSnapshot ParseDecisionResponse(string responseJson, LlmRequestContext context, long receivedAtTicks)
     {
-        using var document = JsonDocument.Parse(responseJson);
-        var root = document.RootElement;
-        var decisionText = GetString(root, "decision", "决策", "decision_body");
-        var shortReason = GetString(root, "short_reason", "shortReason", "reason", "简短理由");
-        var recommendedAction = GetString(root, "recommended_action", "recommendedAction", "action", "建议行动");
-        var priorityTarget = GetString(root, "priority_target", "priorityTarget", "target", "优先目标");
-        var confidence = GetFloat(root, 72f, "confidence", "置信度");
-        var risk = GetFloat(root, 50f, "risk", "风险");
-        var debugText = GetDebugText(root);
-        var debugScoreRead = GetDebugField(root, "score_read", "scoreRead", "比分读取", "score");
-        var debugPositionRead = GetDebugField(root, "position_read", "positionRead", "位置读取", "position");
-        var debugLatencyNote = GetDebugField(root, "latency_note", "latencyNote", "延迟说明", "latency");
+        var parsed = LlmDecisionResponseParser.Parse(responseJson);
         var now = receivedAtTicks >= 0 ? receivedAtTicks : Environment.TickCount64;
-
-        if (string.IsNullOrWhiteSpace(decisionText))
-            decisionText = string.IsNullOrWhiteSpace(recommendedAction) ? "保持本地决策，等待下一帧" : recommendedAction;
-        if (string.IsNullOrWhiteSpace(recommendedAction))
-            recommendedAction = decisionText;
 
         return new BattlefieldLlmStrategicDecisionSnapshot
         {
@@ -810,16 +835,16 @@ public sealed class LlmStrategicDecisionService : IDisposable
             GateReason = context.Gate.Reason,
             SituationKey = context.Gate.SituationKey,
             SessionId = context.SessionId,
-            Decision = Truncate(decisionText, 220),
-            ShortReason = Truncate(shortReason, 260),
-            RecommendedAction = Truncate(recommendedAction, 160),
-            PriorityTarget = Truncate(priorityTarget, 80),
-            Confidence = Math.Clamp(confidence, 0f, 100f),
-            Risk = Math.Clamp(risk, 0f, 100f),
-            DebugText = Truncate(debugText, 600),
-            DebugScoreRead = Truncate(debugScoreRead, 260),
-            DebugPositionRead = Truncate(debugPositionRead, 260),
-            DebugLatencyNote = Truncate(debugLatencyNote, 220),
+            Decision = Truncate(parsed.Decision, 220),
+            ShortReason = Truncate(parsed.ShortReason, 260),
+            RecommendedAction = Truncate(parsed.RecommendedAction, 160),
+            PriorityTarget = Truncate(parsed.PriorityTarget, 80),
+            Confidence = Math.Clamp(parsed.Confidence, 0f, 100f),
+            Risk = Math.Clamp(parsed.Risk, 0f, 100f),
+            DebugText = Truncate(parsed.DebugText, 600),
+            DebugScoreRead = Truncate(parsed.DebugScoreRead, 260),
+            DebugPositionRead = Truncate(parsed.DebugPositionRead, 260),
+            DebugLatencyNote = Truncate(parsed.DebugLatencyNote, 220),
             RawJson = Truncate(responseJson, 1200),
             RequestedAtTicks = context.RequestedAtTicks,
             ReceivedAtTicks = now,
@@ -875,7 +900,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
         string manualInstruction)
     {
         var score = snapshot.ScoreSituation;
-        var decision = snapshot.Decision;
+        var decision = ResolveLocalDecision(snapshot);
         var risk = decision.RiskAssessment;
         var input = decision.DecisionQuality.InputReliability;
         var map = snapshot.Knowledge.CurrentMap;
@@ -1339,7 +1364,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
         var scoreKey = snapshot.ScoreSituation.RankedAlliances.Length > 0
             ? string.Join("-", snapshot.ScoreSituation.RankedAlliances.Select(alliance => $"{alliance.AllianceId}:{alliance.Score / 50}"))
             : "noscore";
-        var objective = snapshot.Decision.PrimaryObjective;
+        var objective = ResolveLocalDecision(snapshot).PrimaryObjective;
         var objectiveKey = objective.HasValue
             ? $"{objective.Value.ObjectiveId}:{objective.Value.State}:{objective.Value.MountedEtaSeconds / 10}"
             : "noobj";
@@ -1354,7 +1379,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
 
     private static string BuildManualSituationKey(BattlefieldSnapshot snapshot, string operatorNote, long now)
     {
-        var objective = snapshot.Decision.PrimaryObjective;
+        var objective = ResolveLocalDecision(snapshot).PrimaryObjective;
         var objectiveKey = objective.HasValue ? objective.Value.ObjectiveId : "noobj";
         var noteKey = string.IsNullOrWhiteSpace(operatorNote) ? "empty" : $"{operatorNote.Length}:{Math.Abs(operatorNote.GetHashCode())}";
         return $"manual:{snapshot.MatchTimeRemaining / 5}:{objectiveKey}:{noteKey}:{now / 1000}";
@@ -1373,13 +1398,23 @@ public sealed class LlmStrategicDecisionService : IDisposable
         return MathF.Sqrt(dx * dx + dz * dz);
     }
 
+    private static BattlefieldDecisionSnapshot ResolveLocalDecision(BattlefieldSnapshot snapshot)
+        => snapshot.LocalDecision.IsAvailable || snapshot.Decision.IsAvailable
+            ? snapshot.LocalDecision.IsAvailable ? snapshot.LocalDecision : snapshot.Decision
+            : new BattlefieldDecisionSnapshot();
+
     private string ResolveApiKey(LlmDecisionConfiguration config)
     {
-        if (!string.IsNullOrWhiteSpace(config.ApiKey))
-            return config.ApiKey.Trim();
-        if (string.IsNullOrWhiteSpace(config.ApiKeyEnvironmentVariable))
-            return string.Empty;
-        return Environment.GetEnvironmentVariable(config.ApiKeyEnvironmentVariable) ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(config.ApiKeyEnvironmentVariable))
+        {
+            var apiKey = Environment.GetEnvironmentVariable(config.ApiKeyEnvironmentVariable);
+            if (!string.IsNullOrWhiteSpace(apiKey))
+                return apiKey.Trim();
+        }
+
+        return string.IsNullOrWhiteSpace(config.ApiKey)
+            ? string.Empty
+            : config.ApiKey.Trim();
     }
 
     private static string NeedKindText(BattlefieldLlmDecisionNeedKind kind)

@@ -28,6 +28,7 @@ public sealed class AreaMapProjectionService : IDisposable
     private const int LocalPlayerMarkerStartNodeIndex = 6;
     private const int MarkerIconImageNodeIndex = 4;
     private const int DefaultSampleIntervalMs = 500;
+    private const int RealtimeSampleIntervalMs = 180;
     private const long SlowSampleLogCooldownMs = 15000;
     private const double SlowSampleWarningMs = 6d;
 
@@ -44,6 +45,7 @@ public sealed class AreaMapProjectionService : IDisposable
     private MapSheet? cachedMap;
     private long lastSampleTicks;
     private long adaptiveSampleBackoffUntilTicks;
+    private long realtimeAdaptiveSampleBackoffUntilTicks;
     private long lastDebugTicks;
     private long lastSlowSampleLogTicks;
     private bool disposed;
@@ -76,11 +78,18 @@ public sealed class AreaMapProjectionService : IDisposable
         cachedMapId = 0;
         lastSampleTicks = 0;
         adaptiveSampleBackoffUntilTicks = 0;
+        realtimeAdaptiveSampleBackoffUntilTicks = 0;
         lastDebugTicks = 0;
         lastSlowSampleLogTicks = 0;
     }
 
     public bool TryGetSnapshot(out AreaMapProjectionSnapshot snapshot)
+        => TryGetSnapshotCore(preferRealtime: false, out snapshot);
+
+    public bool TryGetRealtimeSnapshot(out AreaMapProjectionSnapshot snapshot)
+        => TryGetSnapshotCore(preferRealtime: true, out snapshot);
+
+    private bool TryGetSnapshotCore(bool preferRealtime, out AreaMapProjectionSnapshot snapshot)
     {
         if (disposed)
         {
@@ -91,8 +100,9 @@ public sealed class AreaMapProjectionService : IDisposable
         try
         {
             var now = Environment.TickCount64;
-            var intervalMs = configuration.Performance?.EffectiveAreaMapSampleIntervalMs ?? DefaultSampleIntervalMs;
-            if (now - lastSampleTicks < intervalMs || now < adaptiveSampleBackoffUntilTicks)
+            var intervalMs = ResolveSampleIntervalMs(preferRealtime);
+            var adaptiveBackoffUntilTicks = preferRealtime ? realtimeAdaptiveSampleBackoffUntilTicks : adaptiveSampleBackoffUntilTicks;
+            if (now - lastSampleTicks < intervalMs || now < adaptiveBackoffUntilTicks)
             {
                 if (latestSnapshot.HasValue)
                 {
@@ -105,10 +115,10 @@ public sealed class AreaMapProjectionService : IDisposable
             }
 
             var startedTimestamp = Stopwatch.GetTimestamp();
-            latestSnapshot = TrySample(out var sampledSnapshot) ? sampledSnapshot : null;
+            latestSnapshot = TrySample(preferRealtime, out var sampledSnapshot) ? sampledSnapshot : null;
             lastSampleTicks = now;
             var elapsedMs = Stopwatch.GetElapsedTime(startedTimestamp).TotalMilliseconds;
-            ApplyAdaptiveSamplingBackoff(now, elapsedMs, latestSnapshot?.MapVisionPoints.Length ?? 0);
+            ApplyAdaptiveSamplingBackoff(now, elapsedMs, latestSnapshot?.MapVisionPoints.Length ?? 0, preferRealtime);
             LogSlowSample(now, elapsedMs, latestSnapshot?.MapVisionPoints.Length ?? 0);
         }
         catch (Exception ex)
@@ -127,7 +137,16 @@ public sealed class AreaMapProjectionService : IDisposable
         return false;
     }
 
-    private unsafe bool TrySample(out AreaMapProjectionSnapshot snapshot)
+    private int ResolveSampleIntervalMs(bool preferRealtime)
+    {
+        var configuredIntervalMs = configuration.Performance?.EffectiveAreaMapSampleIntervalMs ?? DefaultSampleIntervalMs;
+        if (!preferRealtime)
+            return configuredIntervalMs;
+
+        return Math.Clamp(Math.Min(configuredIntervalMs, RealtimeSampleIntervalMs), 100, RealtimeSampleIntervalMs);
+    }
+
+    private unsafe bool TrySample(bool preferRealtime, out AreaMapProjectionSnapshot snapshot)
     {
         snapshot = default;
 
@@ -205,7 +224,7 @@ public sealed class AreaMapProjectionService : IDisposable
             Array.Empty<BattlefieldMapVisionPointSnapshot>());
 
         var mapVisionPoints = hasReliableAnchor
-            ? CollectMapVisionPoints(mapComponentNode, baseSnapshot, addonPos, basePos, uiScale, localBattalion)
+            ? CollectMapVisionPoints(mapComponentNode, baseSnapshot, addonPos, basePos, uiScale, localBattalion, preferRealtime)
             : Array.Empty<BattlefieldMapVisionPointSnapshot>();
 
         snapshot = baseSnapshot with
@@ -373,10 +392,18 @@ public sealed class AreaMapProjectionService : IDisposable
         Vector2 addonPos,
         Vector2 basePos,
         float uiScale,
-        byte localBattalion)
+        byte localBattalion,
+        bool preferRealtime)
     {
         if (mapComponentNode == null || mapComponentNode->Component == null || snapshot.HasReliableLocalPlayerAnchor == false)
             return Array.Empty<BattlefieldMapVisionPointSnapshot>();
+
+        if (preferRealtime)
+        {
+            var directPoints = CollectMapVisionPointsDirect(mapComponentNode, snapshot, addonPos, basePos, uiScale, localBattalion);
+            if (directPoints.Length > 0)
+                return directPoints;
+        }
 
         var points = new List<BattlefieldMapVisionPointSnapshot>(32);
         var visitedNodes = new HashSet<nint>();
@@ -393,6 +420,58 @@ public sealed class AreaMapProjectionService : IDisposable
             visitedNodes,
             pointKeys,
             0);
+
+        return points.ToArray();
+    }
+
+    private unsafe BattlefieldMapVisionPointSnapshot[] CollectMapVisionPointsDirect(
+        AtkComponentNode* mapComponentNode,
+        AreaMapProjectionSnapshot snapshot,
+        Vector2 addonPos,
+        Vector2 basePos,
+        float uiScale,
+        byte localBattalion)
+    {
+        if (mapComponentNode == null || mapComponentNode->Component == null)
+            return Array.Empty<BattlefieldMapVisionPointSnapshot>();
+
+        var manager = &mapComponentNode->Component->UldManager;
+        if (manager->NodeList == null)
+            return Array.Empty<BattlefieldMapVisionPointSnapshot>();
+
+        var points = new List<BattlefieldMapVisionPointSnapshot>(32);
+        var pointKeys = new HashSet<string>(StringComparer.Ordinal);
+        var count = Math.Min((int)manager->NodeListCount, 128);
+        for (var i = 0; i < count && points.Count < 128; i++)
+        {
+            var node = manager->NodeList[i];
+            if (node == null)
+                continue;
+
+            var nodePos = new Vector2(node->X + node->OriginX, node->Y + node->OriginY);
+            if (IsComponentNodeType(node->Type))
+            {
+                var componentNode = (AtkComponentNode*)node;
+                if (TryCreateMapVisionPoint(componentNode, nodePos, snapshot, addonPos, basePos, uiScale, localBattalion, out var componentPoint))
+                {
+                    var key = $"{componentPoint.IconId}:{MathF.Round(componentPoint.MapScreenPosition.X, 1)}:{MathF.Round(componentPoint.MapScreenPosition.Y, 1)}";
+                    if (pointKeys.Add(key))
+                        points.Add(componentPoint);
+
+                    continue;
+                }
+            }
+            else if (node->Type == NodeType.Image)
+            {
+                var imageNode = (AtkImageNode*)node;
+                if (TryCreateMapVisionPoint(imageNode, nodePos, snapshot, addonPos, basePos, uiScale, localBattalion, out var imagePoint))
+                {
+                    var key = $"{imagePoint.IconId}:{MathF.Round(imagePoint.MapScreenPosition.X, 1)}:{MathF.Round(imagePoint.MapScreenPosition.Y, 1)}";
+                    if (pointKeys.Add(key))
+                        points.Add(imagePoint);
+                }
+            }
+        }
 
         return points.ToArray();
     }
@@ -652,8 +731,24 @@ public sealed class AreaMapProjectionService : IDisposable
         log.Debug($"[AreaMapProjection] {message}");
     }
 
-    private void ApplyAdaptiveSamplingBackoff(long now, double elapsedMs, int mapVisionPointCount)
+    private void ApplyAdaptiveSamplingBackoff(long now, double elapsedMs, int mapVisionPointCount, bool preferRealtime)
     {
+        if (preferRealtime)
+        {
+            var realtimeBackoffMs = elapsedMs switch
+            {
+                >= 45d => 300L,
+                >= 25d => 200L,
+                >= 12d => 120L,
+                _ => 0L,
+            };
+
+            if (realtimeBackoffMs > 0)
+                realtimeAdaptiveSampleBackoffUntilTicks = Math.Max(realtimeAdaptiveSampleBackoffUntilTicks, now + realtimeBackoffMs);
+
+            return;
+        }
+
         var backoffMs = elapsedMs switch
         {
             >= 60d => 8000L,

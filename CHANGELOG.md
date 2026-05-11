@@ -2,6 +2,13 @@
 
 All notable changes to this plugin will be documented in this file.
 
+## 1.2.0 - 2026-05-12
+
+- Promoted LLM battlefield reads into a more practical in-match workflow with fixed strategic pulses, event-priority gating, and clearer AI-led command display controls.
+- Added regression coverage for score confirmation, strategic arbitration, target resolution wording, overlay AI display stickiness, and LLM scheduling behavior.
+- Extracted frontline parsing and route-risk seams into smaller testable units so battlefield frame input to decision output can be tuned with less guesswork.
+- Removed dead or retired features, including in-game auto target marking remnants and the custom camera distance feature chain.
+
 ## 1.1.2 - 2026-05-11
 
 - Relaxed the LLM gate so in-match testing can trigger more often, with cleaner JSON payload output and richer debug fields.

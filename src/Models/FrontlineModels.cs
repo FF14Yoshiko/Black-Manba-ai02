@@ -1592,6 +1592,7 @@ public sealed class BattlefieldSnapshot
     public BattlefieldChatEventSituationSnapshot ChatEventSituation { get; init; } = new();
     public BattlefieldPlayerFrameEventSituationSnapshot PlayerFrameEvents { get; init; } = new();
     public BattlefieldMapTacticsSnapshot MapTactics { get; init; } = new();
+    public BattlefieldDecisionSnapshot LocalDecision { get; init; } = new();
     public BattlefieldDecisionSnapshot Decision { get; init; } = new();
     public BattlefieldLlmStrategicDecisionSnapshot LlmStrategicDecision { get; init; } = new();
     public FrontlineKnowledgeSnapshot Knowledge { get; init; } = new();

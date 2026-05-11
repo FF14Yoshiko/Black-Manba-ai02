@@ -127,7 +127,7 @@ public class MainWindow : Window, IDisposable
         DrawNavButton(MainPage.Review, "复盘/调试", "赛后详情与诊断");
         DrawNavButton(MainPage.Radar, "雷达设置", "地图、屏幕与标记显示");
         DrawNavButton(MainPage.MapEditor, "地图标注", "点位、路径与危险区");
-        DrawNavButton(MainPage.Tools, "工具", "配置、悬浮球与镜头");
+        DrawNavButton(MainPage.Tools, "\u5DE5\u5177", "\u914D\u7F6E\u3001\u60AC\u6D6E\u7403\u4E0E\u8C03\u8BD5");
 
         ImGui.Spacing();
         ImGui.Separator();
@@ -1047,11 +1047,6 @@ public class MainWindow : Window, IDisposable
             changed |= DrawToggle("区域地图雷达", config.MapRadar, value => config.MapRadar = value);
             changed |= DrawToggle("显示场地标记", config.FieldMarkers, value => config.FieldMarkers = value);
             changed |= DrawToggle("显示目标标记", config.TargetMarkers, value => config.TargetMarkers = value);
-            if (config.AutoMarkFocusTarget)
-            {
-                config.AutoMarkFocusTarget = false;
-                changed = true;
-            }
             DrawHint("不再执行游戏内目标标记；集火信息只保留在指挥界面，不再弹单点窗口。");
             changed |= DrawToggle("玩家对战中隐藏友方玩家", config.HideFriendlyCharacters, value => config.HideFriendlyCharacters = value);
             EndCollapsibleSection();
@@ -2706,7 +2701,6 @@ public class MainWindow : Window, IDisposable
 
         var floating = plugin.Configuration.FloatingButton;
         var commandOverlay = plugin.Configuration.CommandOverlay;
-        var sight = plugin.Configuration.SightDistance;
         var limitBreak = plugin.Configuration.LimitBreak;
         var scoreReader = plugin.Configuration.ScoreReader;
         var battleHigh = plugin.Configuration.BattleHigh;
@@ -2766,6 +2760,8 @@ public class MainWindow : Window, IDisposable
             changed |= DrawSliderInt("请求超时（毫秒）", llmDecision.RequestTimeoutMs, 1500, 15000, value => llmDecision.RequestTimeoutMs = value);
             changed |= DrawSliderInt("最小请求间隔（秒）", llmDecision.MinIntervalSeconds, 3, 120, value => llmDecision.MinIntervalSeconds = value);
             changed |= DrawSliderInt("同局势冷却（秒）", llmDecision.SameSituationCooldownSeconds, 5, 180, value => llmDecision.SameSituationCooldownSeconds = value);
+            changed |= DrawToggle("\u542f\u7528\u56fa\u5b9a\u5c40\u5185 AI \u5206\u6790", llmDecision.RoutinePulseEnabled, value => llmDecision.RoutinePulseEnabled = value);
+            changed |= DrawSliderInt("\u56fa\u5b9a\u5206\u6790\u95f4\u9694\uff08\u79d2\uff09", llmDecision.RoutinePulseIntervalSeconds, 10, 180, value => llmDecision.RoutinePulseIntervalSeconds = value);
             changed |= DrawSliderInt("AI 决策新鲜期（秒）", llmDecision.FreshDecisionSeconds, 10, 180, value => llmDecision.FreshDecisionSeconds = value);
             changed |= DrawSliderInt("上下文保留条数", llmDecision.MaxContextTurns, 0, 12, value => llmDecision.MaxContextTurns = value);
             changed |= DrawToggle("请求中包含调试摘要", llmDecision.IncludeDebugPayload, value => llmDecision.IncludeDebugPayload = value);
@@ -2833,11 +2829,18 @@ public class MainWindow : Window, IDisposable
             changed |= DrawSliderFloat("大字区域高度", commandOverlay.Height, 80f, 520f, value => commandOverlay.Height = value);
             changed |= DrawSliderFloat("大字字号", commandOverlay.FontScale, 0.8f, 5f, value => commandOverlay.FontScale = value);
             changed |= DrawSliderInt("发布后停留秒数", commandOverlay.PublishedHoldSeconds, 1, 20, value => commandOverlay.PublishedHoldSeconds = value);
+            changed |= DrawSliderInt("AI \u4e3b\u5bfc\u9501\u5b9a\u79d2\u6570", commandOverlay.AiLeadHoldSeconds, 0, 20, value => commandOverlay.AiLeadHoldSeconds = value);
             changed |= DrawColorEdit("大字文字颜色", new Vector4(commandOverlay.TextColorR, commandOverlay.TextColorG, commandOverlay.TextColorB, 1f), value =>
             {
                 commandOverlay.TextColorR = value.X;
                 commandOverlay.TextColorG = value.Y;
                 commandOverlay.TextColorB = value.Z;
+            });
+            changed |= DrawColorEdit("AI \u4e3b\u5bfc\u6587\u5b57\u989c\u8272", new Vector4(commandOverlay.AiTextColorR, commandOverlay.AiTextColorG, commandOverlay.AiTextColorB, 1f), value =>
+            {
+                commandOverlay.AiTextColorR = value.X;
+                commandOverlay.AiTextColorG = value.Y;
+                commandOverlay.AiTextColorB = value.Z;
             });
             changed |= DrawColorEdit("大字描边颜色", new Vector4(commandOverlay.StrokeColorR, commandOverlay.StrokeColorG, commandOverlay.StrokeColorB, 1f), value =>
             {
@@ -2854,6 +2857,10 @@ public class MainWindow : Window, IDisposable
                 commandOverlay.Height = 150f;
                 commandOverlay.FontScale = 2.0f;
                 commandOverlay.PublishedHoldSeconds = 5;
+                commandOverlay.AiLeadHoldSeconds = 6;
+                commandOverlay.AiTextColorR = 0.35f;
+                commandOverlay.AiTextColorG = 0.82f;
+                commandOverlay.AiTextColorB = 1f;
                 changed = true;
             }
 
@@ -2864,27 +2871,6 @@ public class MainWindow : Window, IDisposable
             EndCollapsibleSection();
         }
 
-        if (BeginCollapsibleSection("镜头视距", "视距、碰撞、俯仰角和视野角", true))
-        {
-            changed |= DrawToggle("启用无限视野距离", sight.Enabled, value => sight.Enabled = value);
-            changed |= DrawToggle("忽略镜头碰撞", sight.IgnoreCollision, value => sight.IgnoreCollision = value);
-            changed |= DrawSliderFloat("最大距离", sight.MaxDistance, MathF.Max(1f, sight.MinDistance), 80f, value => sight.MaxDistance = value);
-            changed |= DrawSliderFloat("最小距离", sight.MinDistance, 0f, MathF.Max(1f, sight.MaxDistance), value => sight.MinDistance = value);
-            changed |= DrawSliderFloat("最大俯仰角", sight.MaxRotation, sight.MinRotation, 1.569f, value => sight.MaxRotation = value);
-            changed |= DrawSliderFloat("最小俯仰角", sight.MinRotation, -1.569f, sight.MaxRotation, value => sight.MinRotation = value);
-            changed |= DrawSliderFloat("最大视野角", sight.MaxFoV, sight.MinFoV, 3f, value => sight.MaxFoV = value);
-            changed |= DrawSliderFloat("最小视野角", sight.MinFoV, 0.01f, sight.MaxFoV, value => sight.MinFoV = value);
-            changed |= DrawSliderFloat("当前视野角", sight.FoV, sight.MinFoV, sight.MaxFoV, value => sight.FoV = value);
-
-            if (ImGui.Button("恢复推荐镜头参数", new Vector2(190f, 28f)))
-            {
-                sight.ResetToRecommendedDefaults();
-                changed = true;
-            }
-
-            DrawHint(plugin.CameraDistanceService.StatusText);
-            EndCollapsibleSection();
-        }
 
         if (BeginCollapsibleSection("极限槽预测", "极限技充能显示、位置和调试来源", true))
         {
@@ -3020,7 +3006,6 @@ public class MainWindow : Window, IDisposable
         if (changed)
         {
             commandOverlay.Normalize();
-            sight.Normalize();
             limitBreak.Normalize();
             scoreReader.Normalize();
             battleHigh.Normalize();
@@ -3030,7 +3015,6 @@ public class MainWindow : Window, IDisposable
             performance.Normalize();
             llmDecision.Normalize();
             plugin.Configuration.Save();
-            plugin.CameraDistanceService.SyncFromConfiguration();
         }
     }
 
@@ -3081,8 +3065,7 @@ public class MainWindow : Window, IDisposable
                 return;
             }
 
-            if (plugin.Configuration.TryImportFromFile(dialog.FileName, out configurationTransferStatus))
-                plugin.CameraDistanceService.SyncFromConfiguration();
+            plugin.Configuration.TryImportFromFile(dialog.FileName, out configurationTransferStatus);
         }
         catch (Exception ex)
         {

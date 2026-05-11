@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -53,6 +54,7 @@ public sealed class WorldStateService : IDisposable
     private const int DefaultLimitBreakChargeSeconds = 90;
     private const long KeySkillUseHistoryExpiryMs = 90000;
     private const long KeySkillRecentUseWindowMs = 12000;
+    private const int MaxKeySkillUseHistoryEntries = 64;
     private const long PlayerPositionSampleWindowMs = 12000;
     private const long PlayerPositionSampleMinIntervalMs = 500;
     private const float PlayerPositionSampleMinDistance = 0.35f;
@@ -283,6 +285,7 @@ public sealed class WorldStateService : IDisposable
     private readonly MapTacticalAnalysisService mapTacticalAnalysisService;
     private readonly TacticalDecisionEngineService tacticalDecisionEngineService;
     private readonly LlmStrategicDecisionService llmStrategicDecisionService;
+    private readonly StrategicArbitrationService strategicArbitrationService;
     private readonly BattlefieldReplayRecorder battlefieldReplayRecorder;
 
     private BattlefieldSnapshot latestSnapshot = new();
@@ -296,7 +299,8 @@ public sealed class WorldStateService : IDisposable
     private readonly Queue<ScoreHistoryEntry> scoreHistory = new();
     private readonly Queue<KeySkillUseHistoryEntry> keySkillUseHistory = new();
     private readonly Dictionary<string, long> lastKeySkillUseByKey = new(StringComparer.Ordinal);
-    private readonly Dictionary<(ulong GameObjectId, string SkillName), long> lastKeySkillUseTicksByPlayerSkill = new();
+    private readonly ConcurrentDictionary<(ulong GameObjectId, string SkillName), long> lastKeySkillUseTicksByPlayerSkill = new();
+    private readonly ConcurrentDictionary<ulong, long> lastEngagementTicksByPlayerId = new();
     private ContextDerivedAnalysisSnapshot cachedContextDerivedAnalysis = new();
     private Task<ContextDerivedAnalysisResult>? contextDerivedAnalysisTask;
     private long lastContextDerivedAnalysisRequestedTicks = -1;
@@ -342,6 +346,8 @@ public sealed class WorldStateService : IDisposable
     private long lastEnemyMainGroupTrackBuildTicks;
     private EnemyMainGroupObservationEntry? lastEnemyMainGroupObservation;
     private ObjectTableSnapshot cachedObjectTableState = new(Array.Empty<BattlefieldPlayerSnapshot>(), Array.Empty<BattlefieldObjectiveActorSnapshot>(), null);
+    private RespawnHistoryEntrySample[] cachedRespawnHistorySamples = Array.Empty<RespawnHistoryEntrySample>();
+    private KeySkillUseHistoryEntry[] cachedKeySkillUseHistoryEntries = Array.Empty<KeySkillUseHistoryEntry>();
     private FrontlineMapType cachedObjectTableMapType;
     private uint cachedObjectTableTerritoryType;
     private uint cachedObjectTableMapId;
@@ -371,6 +377,7 @@ public sealed class WorldStateService : IDisposable
         MapTacticalAnalysisService mapTacticalAnalysisService,
         TacticalDecisionEngineService tacticalDecisionEngineService,
         LlmStrategicDecisionService llmStrategicDecisionService,
+        StrategicArbitrationService strategicArbitrationService,
         BattlefieldReplayRecorder battlefieldReplayRecorder)
     {
         this.configuration = configuration;
@@ -389,6 +396,7 @@ public sealed class WorldStateService : IDisposable
         this.mapTacticalAnalysisService = mapTacticalAnalysisService;
         this.tacticalDecisionEngineService = tacticalDecisionEngineService;
         this.llmStrategicDecisionService = llmStrategicDecisionService;
+        this.strategicArbitrationService = strategicArbitrationService;
         this.battlefieldReplayRecorder = battlefieldReplayRecorder;
 
         framework.Update += OnFrameworkUpdate;
@@ -417,6 +425,9 @@ public sealed class WorldStateService : IDisposable
         keySkillUseHistory.Clear();
         lastKeySkillUseByKey.Clear();
         lastKeySkillUseTicksByPlayerSkill.Clear();
+        lastEngagementTicksByPlayerId.Clear();
+        cachedRespawnHistorySamples = Array.Empty<RespawnHistoryEntrySample>();
+        cachedKeySkillUseHistoryEntries = Array.Empty<KeySkillUseHistoryEntry>();
         cachedContextDerivedAnalysis = new ContextDerivedAnalysisSnapshot();
         contextDerivedAnalysisTask = null;
         lastContextDerivedAnalysisRequestedTicks = -1;
@@ -532,8 +543,11 @@ public sealed class WorldStateService : IDisposable
                 case WorldRefreshStage.UpdateHistory:
                     AdvanceRefreshHistoryStage(session, now);
                     break;
-                case WorldRefreshStage.QueueDerivedAnalyses:
-                    AdvanceRefreshDerivedStage(session, now);
+                case WorldRefreshStage.QueueTeamDerivedAnalysis:
+                    AdvanceRefreshTeamDerivedAnalysisStage(session, now);
+                    break;
+                case WorldRefreshStage.QueueThreatAnalysis:
+                    AdvanceRefreshThreatAnalysisStage(session, now);
                     break;
                 case WorldRefreshStage.Assemble:
                     AdvanceRefreshAssembleStage(session, now);
@@ -544,8 +558,14 @@ public sealed class WorldStateService : IDisposable
                 case WorldRefreshStage.PrepareStatus:
                     AdvanceRefreshStatusStage(session, now);
                     break;
+                case WorldRefreshStage.FinalizeSnapshot:
+                    AdvanceFinalizeSnapshotStage(session, now);
+                    break;
+                case WorldRefreshStage.FinalizeLlm:
+                    AdvanceFinalizeLlmStage(session, now);
+                    break;
                 case WorldRefreshStage.Finalize:
-                    FinalizeRefreshSession(session, now);
+                    AdvanceFinalizeCommitStage(session, now);
                     break;
             }
         }
@@ -637,6 +657,7 @@ public sealed class WorldStateService : IDisposable
                 IsAreaTransitioning = session.IsAreaTransitioning,
                 MatchTimeRemaining = session.ScoreSnapshot.MatchTimeRemaining,
                 ScoreSituation = BuildScoreSituation(session.ScoreSnapshot, session.Knowledge.CurrentMap, session.MapType, null, now),
+                LocalDecision = new BattlefieldDecisionSnapshot(),
                 Knowledge = session.Knowledge,
                 StatusText = cachedStatusText
             };
@@ -715,10 +736,11 @@ public sealed class WorldStateService : IDisposable
         PrunePlayerHistory(now);
         ImportKeySkillLogEvents(session.Players, session.KeySkillLogEvents, now);
         PruneKeySkillUseHistory(now);
-        session.Stage = WorldRefreshStage.QueueDerivedAnalyses;
+        cachedRespawnHistorySamples = CaptureRespawnHistorySamples();
+        session.Stage = WorldRefreshStage.QueueTeamDerivedAnalysis;
     }
 
-    private void AdvanceRefreshDerivedStage(PendingWorldRefreshSession session, long now)
+    private void AdvanceRefreshTeamDerivedAnalysisStage(PendingWorldRefreshSession session, long now)
     {
         QueueTeamDerivedAnalysis(
             now,
@@ -728,6 +750,11 @@ public sealed class WorldStateService : IDisposable
             session.MapVisionPoints,
             session.MapVisionClusters,
             session.LocalPlayer);
+        session.Stage = WorldRefreshStage.QueueThreatAnalysis;
+    }
+
+    private void AdvanceRefreshThreatAnalysisStage(PendingWorldRefreshSession session, long now)
+    {
         QueueThreatAnalysis(
             now,
             session.IsInFrontline,
@@ -763,7 +790,7 @@ public sealed class WorldStateService : IDisposable
             || !latestSnapshot.Decision.IsAvailable
             || now - lastStrategicDecisionRefreshTicks >= decisionIntervalMs);
         session.MapTactics = session.CanReuseDecisionLayer ? latestSnapshot.MapTactics : new BattlefieldMapTacticsSnapshot();
-        session.Decision = session.CanReuseDecisionLayer ? latestSnapshot.Decision : new BattlefieldDecisionSnapshot();
+        session.Decision = session.CanReuseDecisionLayer ? latestSnapshot.LocalDecision : new BattlefieldDecisionSnapshot();
         session.TeamSituation.AdvancedTactics = session.CanReuseDecisionLayer
             ? latestSnapshot.TeamSituation.AdvancedTactics
             : new BattlefieldAdvancedTacticalSituationSnapshot();
@@ -807,10 +834,10 @@ public sealed class WorldStateService : IDisposable
             lastStatusTextRefreshTicks = now;
         }
 
-        session.Stage = WorldRefreshStage.Finalize;
+        session.Stage = WorldRefreshStage.FinalizeSnapshot;
     }
 
-    private void FinalizeRefreshSession(PendingWorldRefreshSession session, long now)
+    private void AdvanceFinalizeSnapshotStage(PendingWorldRefreshSession session, long now)
     {
         latestSnapshot = new BattlefieldSnapshot
         {
@@ -841,6 +868,7 @@ public sealed class WorldStateService : IDisposable
             ChatEventSituation = session.ChatEventSituation,
             PlayerFrameEvents = session.PlayerFrameEvents,
             MapTactics = session.MapTactics,
+            LocalDecision = session.Decision,
             Decision = session.Decision,
             Knowledge = session.Knowledge,
             FriendlyPlayerCount = session.Players.Count(player => player.Relation == BattlefieldPlayerRelation.Friendly),
@@ -850,8 +878,17 @@ public sealed class WorldStateService : IDisposable
             ScoreDebugInfo = session.ScoreSnapshot.DebugInfo,
             StatusText = cachedStatusText
         };
-        latestSnapshot = BuildSnapshotWithLlmDecision(latestSnapshot, llmStrategicDecisionService.GetSnapshot(latestSnapshot));
+        session.Stage = WorldRefreshStage.FinalizeLlm;
+    }
 
+    private void AdvanceFinalizeLlmStage(PendingWorldRefreshSession session, long now)
+    {
+        latestSnapshot = BuildSnapshotWithLlmDecision(latestSnapshot, llmStrategicDecisionService.GetSnapshot(latestSnapshot));
+        session.Stage = WorldRefreshStage.Finalize;
+    }
+
+    private void AdvanceFinalizeCommitStage(PendingWorldRefreshSession session, long now)
+    {
         if (session.ShouldQueueDecisionLayer)
         {
             QueueDecisionRefresh(
@@ -932,6 +969,7 @@ public sealed class WorldStateService : IDisposable
                     IsAreaTransitioning = condition[ConditionFlag.BetweenAreas] || condition[ConditionFlag.BetweenAreas51],
                     MatchTimeRemaining = scoreSnapshot.MatchTimeRemaining,
                     ScoreSituation = BuildScoreSituation(scoreSnapshot, knowledge.CurrentMap, mapType, null, now),
+                    LocalDecision = new BattlefieldDecisionSnapshot(),
                     Knowledge = knowledge,
                     StatusText = cachedStatusText
                 };
@@ -983,6 +1021,7 @@ public sealed class WorldStateService : IDisposable
             PrunePlayerHistory(now);
             ImportKeySkillLogEvents(players, keySkillLogEvents, now);
             PruneKeySkillUseHistory(now);
+            cachedRespawnHistorySamples = CaptureRespawnHistorySamples();
             QueueTeamDerivedAnalysis(
                 now,
                 isInFrontline,
@@ -1479,7 +1518,7 @@ public sealed class WorldStateService : IDisposable
             MapTactics = snapshot.MapTactics,
             LimitBreakThreats = cachedLimitBreakThreats,
             KeySkillThreats = cachedKeySkillThreats,
-            RespawnHistory = CaptureRespawnHistorySamples()
+            RespawnHistory = cachedRespawnHistorySamples
         });
     }
 
@@ -1607,11 +1646,9 @@ public sealed class WorldStateService : IDisposable
             keySkillLogEvents.IsAvailable,
             keySkillLogEvents.SourceText,
             now,
-            playerHistory.Values
-                .Where(entry => entry.LastEngagementTicks > 0)
-                .ToDictionary(entry => entry.GameObjectId, entry => entry.LastEngagementTicks),
-            new Dictionary<(ulong GameObjectId, string SkillName), long>(lastKeySkillUseTicksByPlayerSkill),
-            keySkillUseHistory.ToArray());
+            lastEngagementTicksByPlayerId,
+            lastKeySkillUseTicksByPlayerSkill,
+            cachedKeySkillUseHistoryEntries);
         threatAnalysisTask = Task.Run(() => BuildThreatAnalysisResult(request));
     }
 
@@ -1642,7 +1679,7 @@ public sealed class WorldStateService : IDisposable
             SnapshotArray(mapVisionClusters),
             localPlayer,
             now,
-            CaptureRespawnHistorySamples());
+            cachedRespawnHistorySamples);
         teamDerivedAnalysisTask = Task.Run(() => BuildTeamDerivedAnalysisResult(request));
     }
 
@@ -1868,7 +1905,7 @@ public sealed class WorldStateService : IDisposable
             MapTactics = baseSnapshot.MapTactics,
             LimitBreakThreats = baseSnapshot.TeamSituation.LimitBreakThreats,
             KeySkillThreats = baseSnapshot.TeamSituation.KeySkillThreats,
-            RespawnHistory = CaptureRespawnHistorySamples()
+            RespawnHistory = cachedRespawnHistorySamples
         });
     }
 
@@ -2109,6 +2146,7 @@ public sealed class WorldStateService : IDisposable
             ChatEventSituation = snapshot.ChatEventSituation,
             PlayerFrameEvents = stateSnapshot.PlayerFrameEvents,
             MapTactics = mapTactics,
+            LocalDecision = decision,
             Decision = decision,
             LlmStrategicDecision = snapshot.LlmStrategicDecision,
             Knowledge = snapshot.Knowledge,
@@ -2154,6 +2192,7 @@ public sealed class WorldStateService : IDisposable
             ChatEventSituation = snapshot.ChatEventSituation,
             PlayerFrameEvents = stateSnapshot.PlayerFrameEvents,
             MapTactics = snapshot.MapTactics,
+            LocalDecision = decision,
             Decision = decision,
             LlmStrategicDecision = snapshot.LlmStrategicDecision,
             Knowledge = snapshot.Knowledge,
@@ -2165,10 +2204,15 @@ public sealed class WorldStateService : IDisposable
             StatusText = snapshot.StatusText
         };
 
-    private static BattlefieldSnapshot BuildSnapshotWithLlmDecision(
+    private BattlefieldSnapshot BuildSnapshotWithLlmDecision(
         BattlefieldSnapshot snapshot,
         BattlefieldLlmStrategicDecisionSnapshot llmDecision)
-        => new()
+    {
+        var localDecision = snapshot.LocalDecision.IsAvailable || snapshot.Decision.IsAvailable
+            ? snapshot.LocalDecision.IsAvailable ? snapshot.LocalDecision : snapshot.Decision
+            : new BattlefieldDecisionSnapshot();
+        var finalDecision = strategicArbitrationService.Apply(snapshot, localDecision, llmDecision);
+        return new BattlefieldSnapshot
         {
             UpdatedAtTicks = snapshot.UpdatedAtTicks,
             TerritoryType = snapshot.TerritoryType,
@@ -2197,7 +2241,8 @@ public sealed class WorldStateService : IDisposable
             ChatEventSituation = snapshot.ChatEventSituation,
             PlayerFrameEvents = snapshot.PlayerFrameEvents,
             MapTactics = snapshot.MapTactics,
-            Decision = snapshot.Decision,
+            LocalDecision = localDecision,
+            Decision = finalDecision,
             LlmStrategicDecision = llmDecision,
             Knowledge = snapshot.Knowledge,
             FriendlyPlayerCount = snapshot.FriendlyPlayerCount,
@@ -2207,6 +2252,7 @@ public sealed class WorldStateService : IDisposable
             ScoreDebugInfo = snapshot.ScoreDebugInfo,
             StatusText = snapshot.StatusText
         };
+    }
 
     private void LogSlowDecisionRefresh(long now, double elapsedMs)
     {
@@ -8563,8 +8609,8 @@ public sealed class WorldStateService : IDisposable
                 }
             }
 
-            if (!isNew)
-                RecordKeySkillStateTransitions(entry, player, playerById, knowledge, now);
+        if (!isNew)
+            RecordKeySkillStateTransitions(entry, player, playerById, knowledge, now);
 
             UpdatePlayerMovementHistory(entry, player, isNew, now);
             entry.Name = player.Name;
@@ -8585,7 +8631,10 @@ public sealed class WorldStateService : IDisposable
             entry.IsExecutable = player.IsExecutable;
             entry.HasSnowBlessing = player.HasSnowBlessing;
             if (player.IsInCombat || player.IsCasting || IsValidGameObjectId(player.TargetObjectId) || IsValidGameObjectId(player.CastTargetObjectId))
+            {
                 entry.LastEngagementTicks = now;
+                lastEngagementTicksByPlayerId[player.GameObjectId] = now;
+            }
             entry.LastSeenTicks = now;
         }
 
@@ -8602,7 +8651,10 @@ public sealed class WorldStateService : IDisposable
         if (stalePlayerIds != null)
         {
             foreach (var key in stalePlayerIds)
+            {
                 playerHistory.Remove(key);
+                lastEngagementTicksByPlayerId.TryRemove(key, out _);
+            }
         }
 
         PruneKeySkillUseHistory(now);
@@ -8736,7 +8788,7 @@ public sealed class WorldStateService : IDisposable
         lastKeySkillUseByKey[key] = now;
         lastKeySkillUseTicksByPlayerSkill[(player.GameObjectId, skillName)] = now;
         var jobInfo = ResolveJobInfo(player.ClassJobId);
-        keySkillUseHistory.Enqueue(new KeySkillUseHistoryEntry(
+        var historyEntry = new KeySkillUseHistoryEntry(
             now,
             player.GameObjectId,
             player.Name,
@@ -8749,7 +8801,9 @@ public sealed class WorldStateService : IDisposable
             kind,
             targetName,
             sourceText,
-            evidenceText));
+            evidenceText);
+        keySkillUseHistory.Enqueue(historyEntry);
+        AppendKeySkillUseHistorySnapshot(historyEntry);
         PruneKeySkillUseHistory(now);
     }
 
@@ -8763,7 +8817,7 @@ public sealed class WorldStateService : IDisposable
             return;
 
         lastKeySkillUseByKey[key] = item.ObservedAtTicks;
-        keySkillUseHistory.Enqueue(new KeySkillUseHistoryEntry(
+        var historyEntry = new KeySkillUseHistoryEntry(
             item.ObservedAtTicks,
             0,
             item.Name,
@@ -8776,14 +8830,25 @@ public sealed class WorldStateService : IDisposable
             item.Kind,
             item.TargetName,
             item.SourceText,
-            item.EvidenceText));
+            item.EvidenceText);
+        keySkillUseHistory.Enqueue(historyEntry);
+        AppendKeySkillUseHistorySnapshot(historyEntry);
         PruneKeySkillUseHistory(now);
     }
 
     private void PruneKeySkillUseHistory(long now)
     {
+        var changed = false;
         while (keySkillUseHistory.Count > 0 && now - keySkillUseHistory.Peek().ObservedAtTicks > KeySkillUseHistoryExpiryMs)
+        {
             keySkillUseHistory.Dequeue();
+            changed = true;
+        }
+        while (keySkillUseHistory.Count > MaxKeySkillUseHistoryEntries)
+        {
+            keySkillUseHistory.Dequeue();
+            changed = true;
+        }
 
         List<string>? staleKeys = null;
         foreach (var pair in lastKeySkillUseByKey)
@@ -8799,6 +8864,7 @@ public sealed class WorldStateService : IDisposable
         {
             foreach (var key in staleKeys)
                 lastKeySkillUseByKey.Remove(key);
+            changed = true;
         }
 
         List<(ulong GameObjectId, string SkillName)>? stalePlayerSkillKeys = null;
@@ -8811,12 +8877,35 @@ public sealed class WorldStateService : IDisposable
             stalePlayerSkillKeys.Add(pair.Key);
         }
 
-        if (stalePlayerSkillKeys == null)
-            return;
+        if (stalePlayerSkillKeys != null)
+        {
+            foreach (var key in stalePlayerSkillKeys)
+                lastKeySkillUseTicksByPlayerSkill.TryRemove(key, out _);
+            changed = true;
+        }
 
-        foreach (var key in stalePlayerSkillKeys)
-            lastKeySkillUseTicksByPlayerSkill.Remove(key);
+        if (changed)
+            RebuildKeySkillUseHistorySnapshot();
     }
+
+    private void AppendKeySkillUseHistorySnapshot(KeySkillUseHistoryEntry entry)
+    {
+        if (cachedKeySkillUseHistoryEntries.Length == 0)
+        {
+            cachedKeySkillUseHistoryEntries = new[] { entry };
+            return;
+        }
+
+        var next = new KeySkillUseHistoryEntry[Math.Min(MaxKeySkillUseHistoryEntries, cachedKeySkillUseHistoryEntries.Length + 1)];
+        var copyCount = Math.Min(next.Length - 1, cachedKeySkillUseHistoryEntries.Length);
+        if (copyCount > 0)
+            Array.Copy(cachedKeySkillUseHistoryEntries, Math.Max(0, cachedKeySkillUseHistoryEntries.Length - copyCount), next, 0, copyCount);
+        next[^1] = entry;
+        cachedKeySkillUseHistoryEntries = next;
+    }
+
+    private void RebuildKeySkillUseHistorySnapshot()
+        => cachedKeySkillUseHistoryEntries = keySkillUseHistory.ToArray();
 
     private static string ResolveTargetName(
         ulong targetObjectId,
@@ -9363,10 +9452,13 @@ public sealed class WorldStateService : IDisposable
         CollectVision,
         CollectSignals,
         UpdateHistory,
-        QueueDerivedAnalyses,
+        QueueTeamDerivedAnalysis,
+        QueueThreatAnalysis,
         Assemble,
         PrepareDecisionAssets,
         PrepareStatus,
+        FinalizeSnapshot,
+        FinalizeLlm,
         Finalize
     }
 

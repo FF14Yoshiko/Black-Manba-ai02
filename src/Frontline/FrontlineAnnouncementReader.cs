@@ -420,43 +420,7 @@ public sealed unsafe class FrontlineAnnouncementReader : IDisposable
     }
 
     private static bool TryCreateAnnouncement(string source, string text, long now, out BattlefieldAnnouncementSnapshot announcement)
-    {
-        announcement = default;
-        if (!LooksLikeBattleAnnouncement(text))
-            return false;
-
-        var weather = InferWeather(text);
-        var weatherName = WeatherName(weather);
-        var locationId = TryParseLocationId(text, out var parsedLocationId) ? parsedLocationId : string.Empty;
-        var rankName = InferRankName(text);
-        var ownership = InferOwnership(text);
-        var countdown = TryParseCountdownSeconds(text, out var seconds) ? seconds : (int?)null;
-        var kind = InferKind(text, weather, ownership, locationId);
-        if (kind == BattlefieldAnnouncementKind.Unknown)
-            return false;
-
-        if (countdown == null && kind == BattlefieldAnnouncementKind.WeatherWarning)
-            countdown = 15;
-        if (countdown == null && kind == BattlefieldAnnouncementKind.ObjectiveWarning)
-            countdown = 30;
-
-        var remaining = countdown;
-        announcement = new BattlefieldAnnouncementSnapshot(
-            now,
-            0,
-            source,
-            text,
-            kind,
-            weather,
-            weatherName,
-            locationId,
-            rankName,
-            ownership,
-            countdown,
-            remaining,
-            BuildAnnouncementSummary(kind, weatherName, locationId, rankName, ownership, countdown, text));
-        return true;
-    }
+        => FrontlineAnnouncementTextParser.TryParse(source, text, now, out announcement);
 
     private static bool LooksLikeBattleAnnouncement(string text)
         => ContainsAny(text,

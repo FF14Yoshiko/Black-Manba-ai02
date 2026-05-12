@@ -286,6 +286,7 @@ public sealed class WorldStateService : IDisposable
     private readonly TacticalDecisionEngineService tacticalDecisionEngineService;
     private readonly LlmStrategicDecisionService llmStrategicDecisionService;
     private readonly StrategicArbitrationService strategicArbitrationService;
+    private readonly AiTeacherLearningService aiTeacherLearningService;
     private readonly BattlefieldReplayRecorder battlefieldReplayRecorder;
 
     private BattlefieldSnapshot latestSnapshot = new();
@@ -378,6 +379,7 @@ public sealed class WorldStateService : IDisposable
         TacticalDecisionEngineService tacticalDecisionEngineService,
         LlmStrategicDecisionService llmStrategicDecisionService,
         StrategicArbitrationService strategicArbitrationService,
+        AiTeacherLearningService aiTeacherLearningService,
         BattlefieldReplayRecorder battlefieldReplayRecorder)
     {
         this.configuration = configuration;
@@ -397,6 +399,7 @@ public sealed class WorldStateService : IDisposable
         this.tacticalDecisionEngineService = tacticalDecisionEngineService;
         this.llmStrategicDecisionService = llmStrategicDecisionService;
         this.strategicArbitrationService = strategicArbitrationService;
+        this.aiTeacherLearningService = aiTeacherLearningService;
         this.battlefieldReplayRecorder = battlefieldReplayRecorder;
 
         framework.Update += OnFrameworkUpdate;
@@ -662,7 +665,7 @@ public sealed class WorldStateService : IDisposable
                 StatusText = cachedStatusText
             };
             latestSnapshot = BuildSnapshotWithLlmDecision(standbySnapshot, llmStrategicDecisionService.GetSnapshot(standbySnapshot));
-            battlefieldReplayRecorder.Record(latestSnapshot);
+            RecordReplayArtifacts();
             session.ShouldLogCompletion = true;
             activeWorldRefreshSession = null;
             return;
@@ -898,7 +901,7 @@ public sealed class WorldStateService : IDisposable
                 session.Knowledge.CurrentMap?.Name ?? session.ScoreSituation.MapName);
         }
 
-        battlefieldReplayRecorder.Record(latestSnapshot);
+        RecordReplayArtifacts();
         session.ShouldLogCompletion = true;
         activeWorldRefreshSession = null;
     }
@@ -974,7 +977,7 @@ public sealed class WorldStateService : IDisposable
                     StatusText = cachedStatusText
                 };
                 latestSnapshot = BuildSnapshotWithLlmDecision(standbySnapshot, llmStrategicDecisionService.GetSnapshot(standbySnapshot));
-                battlefieldReplayRecorder.Record(latestSnapshot);
+                RecordReplayArtifacts();
                 return;
             }
 
@@ -1121,7 +1124,7 @@ public sealed class WorldStateService : IDisposable
                     keySkillLogEvents,
                     knowledge.CurrentMap?.Name ?? scoreSituation.MapName);
 
-            battlefieldReplayRecorder.Record(latestSnapshot);
+            RecordReplayArtifacts();
         }
         catch (Exception ex)
         {
@@ -2035,7 +2038,9 @@ public sealed class WorldStateService : IDisposable
                     pending.PlayerFrameEvents,
                     pending.Knowledge,
                     configuration.Performance?.EnableDecisionQualityFeedback == true
-                        ? battlefieldReplayRecorder.GetCommandEffectivenessSnapshots()
+                        ? DecisionQualityFeedbackFusion.Merge(
+                            battlefieldReplayRecorder.GetCommandEffectivenessSnapshots(),
+                            aiTeacherLearningService.GetCommandEffectivenessSnapshots(pending.ScoreSituation.MapType))
                         : Array.Empty<BattlefieldCommandEffectivenessSnapshot>());
             }
 
@@ -2101,6 +2106,12 @@ public sealed class WorldStateService : IDisposable
         lastCombatDecisionRefreshTicks = now;
         var snapshotWithDecision = BuildSnapshotWithDecisionLayer(now, latestSnapshot, result.Pending, result.StateSnapshot, result.MapTactics, result.Decision);
         latestSnapshot = BuildSnapshotWithLlmDecision(snapshotWithDecision, llmStrategicDecisionService.EvaluateAndMaybeRequest(snapshotWithDecision));
+        RecordReplayArtifacts();
+    }
+
+    private void RecordReplayArtifacts()
+    {
+        aiTeacherLearningService.Record(latestSnapshot);
         battlefieldReplayRecorder.Record(latestSnapshot);
     }
 

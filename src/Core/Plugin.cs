@@ -52,6 +52,7 @@ public class Plugin : IDalamudPlugin
     public TacticalDecisionEngineService TacticalDecisionEngineService { get; init; }
     public LlmStrategicDecisionService LlmStrategicDecisionService { get; init; }
     public StrategicArbitrationService StrategicArbitrationService { get; init; }
+    public AiTeacherLearningService AiTeacherLearningService { get; init; }
     public BattlefieldReplayRecorder BattlefieldReplayRecorder { get; init; }
     public CommandOverlayService CommandOverlayService { get; init; }
 
@@ -108,11 +109,14 @@ public class Plugin : IDalamudPlugin
         MapTacticalAnalysisService = new MapTacticalAnalysisService(MapAnnotationService, MapTacticalGraphService);
         TacticalDecisionEngineService = new TacticalDecisionEngineService();
         LlmStrategicDecisionService = new LlmStrategicDecisionService(Configuration, log);
+        AiTeacherLearningService = new AiTeacherLearningService(
+            () => Configuration.Performance?.EnableDecisionQualityFeedback == true,
+            () => BattlefieldReplayStoragePath.ResolveDirectory(Configuration.Replay.DirectoryName));
         StrategicArbitrationService = new StrategicArbitrationService();
         BattlefieldReplayRecorder = new BattlefieldReplayRecorder(Configuration, log);
         CommandOverlayService = new CommandOverlayService(Configuration, PluginInterface.UiBuilder);
         StatusEffectTracker = new StatusEffectTracker(Configuration, objectTable, clientState, framework, log);
-        WorldStateService = new WorldStateService(Configuration, clientState, objectTable, framework, condition, log, FrontlineScoreReader, AreaMapProjectionService, LimitBreakService, FrontlineAnnouncementReader, FrontlineChatEventReader, FrontlineKeySkillEventReader, StatusEffectTracker, MapTacticalAnalysisService, TacticalDecisionEngineService, LlmStrategicDecisionService, StrategicArbitrationService, BattlefieldReplayRecorder);
+        WorldStateService = new WorldStateService(Configuration, clientState, objectTable, framework, condition, log, FrontlineScoreReader, AreaMapProjectionService, LimitBreakService, FrontlineAnnouncementReader, FrontlineChatEventReader, FrontlineKeySkillEventReader, StatusEffectTracker, MapTacticalAnalysisService, TacticalDecisionEngineService, LlmStrategicDecisionService, StrategicArbitrationService, AiTeacherLearningService, BattlefieldReplayRecorder);
         FrontlineRadar = new FrontlineRadar(this, gameGui, textureProvider, dataManager, log, AreaMapProjectionService);
         FloatingToggle = new FloatingToggle(this);
         MainWindow = new MainWindow(this);
@@ -146,6 +150,7 @@ public class Plugin : IDalamudPlugin
         WindowSystem.RemoveAllWindows();
         MainWindow.Dispose();
         WorldStateService.Dispose();
+        AiTeacherLearningService.Dispose();
         FrontlineScoreReader.Dispose();
         FrontlineRadar.Dispose();
         LimitBreakService.Dispose();

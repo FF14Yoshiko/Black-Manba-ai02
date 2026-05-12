@@ -1442,6 +1442,8 @@ public sealed class CommandOverlayService : IDisposable
                 ? BlendColor(aiTextColor, new Vector4(0.60f, 1f, 0.84f, 1f), 0.34f)
                 : new Vector4(0.48f, 0.90f, 0.62f, 1f);
             var strokeColor = new Vector4(config.StrokeColorR, config.StrokeColorG, config.StrokeColorB, 1f);
+            if (content.IsAiLead)
+                DrawAiLeadBadge(config, aiTextColor, strokeColor);
             DrawWrappedText(content.PrimaryCommandLine, Math.Clamp(config.FontScale * 0.72f, 1.0f, 3.2f), width, textColor, strokeColor, config.ShowStroke, objectiveFontHandle);
             ImGui.SetCursorScreenPos(ImGui.GetCursorScreenPos() + new Vector2(0f, 2f));
             DrawWrappedText(content.CurrentActionLine, Math.Clamp(config.FontScale * 0.44f, 0.76f, 2.0f), width, currentActionColor, strokeColor, config.ShowStroke, threatFontHandle);
@@ -1451,6 +1453,29 @@ public sealed class CommandOverlayService : IDisposable
 
         ImGui.End();
         ImGui.PopStyleVar(2);
+    }
+
+    private void DrawAiLeadBadge(
+        CommandOverlayConfiguration config,
+        Vector4 aiTextColor,
+        Vector4 strokeColor)
+    {
+        const string label = "AI";
+        IFontHandle? badgeFont = null;
+        var badgeScale = Math.Clamp(config.FontScale * 0.34f, 0.76f, 1.15f);
+        var textSize = MeasureOverlayText(label, badgeScale, badgeFont);
+        var padding = new Vector2(6f, 2f);
+        var badgeSize = textSize + padding * 2f;
+        var windowPos = ImGui.GetWindowPos();
+        var badgePos = windowPos + new Vector2(
+            MathF.Max(10f, config.Width - badgeSize.X - 14f),
+            10f);
+        var backgroundColor = BlendColor(aiTextColor, new Vector4(0.04f, 0.08f, 0.12f, 0.96f), 0.58f);
+        var borderColor = BlendColor(aiTextColor, Vector4.One, 0.28f);
+        var drawList = ImGui.GetWindowDrawList();
+        drawList.AddRectFilled(badgePos, badgePos + badgeSize, ImGui.ColorConvertFloat4ToU32(backgroundColor), 5f);
+        drawList.AddRect(badgePos, badgePos + badgeSize, ImGui.ColorConvertFloat4ToU32(borderColor), 5f, ImDrawFlags.None, 1.2f);
+        DrawOverlayBadgeText(label, badgePos + padding, badgeScale, aiTextColor, strokeColor, config.ShowStroke, badgeFont);
     }
 
     private static Vector2 ResolvePosition(CommandOverlayConfiguration config)
@@ -1517,6 +1542,57 @@ public sealed class CommandOverlayService : IDisposable
         ImGui.PopStyleColor();
         ImGui.PopTextWrapPos();
     }
+
+    private static Vector2 MeasureOverlayText(string text, float fontScale, IFontHandle? fontHandle)
+    {
+        var push = fontHandle?.Push();
+        var useScaledFallback = push is null;
+        if (useScaledFallback)
+            ImGui.SetWindowFontScale(fontScale);
+
+        var size = ImGui.CalcTextSize(text);
+
+        if (useScaledFallback)
+            ImGui.SetWindowFontScale(1f);
+
+        push?.Dispose();
+        return size;
+    }
+
+    private static void DrawOverlayBadgeText(
+        string text,
+        Vector2 position,
+        float fontScale,
+        Vector4 textColor,
+        Vector4 strokeColor,
+        bool showStroke,
+        IFontHandle? fontHandle)
+    {
+        var push = fontHandle?.Push();
+        var useScaledFallback = push is null;
+        if (useScaledFallback)
+            ImGui.SetWindowFontScale(fontScale);
+
+        var drawList = ImGui.GetWindowDrawList();
+        if (showStroke)
+        {
+            var stroke = MathF.Max(1f, fontScale);
+            DrawOverlayBadgeTextAt(drawList, text, position + new Vector2(-stroke, 0f), strokeColor);
+            DrawOverlayBadgeTextAt(drawList, text, position + new Vector2(stroke, 0f), strokeColor);
+            DrawOverlayBadgeTextAt(drawList, text, position + new Vector2(0f, -stroke), strokeColor);
+            DrawOverlayBadgeTextAt(drawList, text, position + new Vector2(0f, stroke), strokeColor);
+        }
+
+        DrawOverlayBadgeTextAt(drawList, text, position, textColor);
+
+        if (useScaledFallback)
+            ImGui.SetWindowFontScale(1f);
+
+        push?.Dispose();
+    }
+
+    private static void DrawOverlayBadgeTextAt(ImDrawListPtr drawList, string text, Vector2 position, Vector4 color)
+        => drawList.AddText(position, ImGui.ColorConvertFloat4ToU32(color), text);
 
     private static Vector4 BlendColor(Vector4 source, Vector4 target, float amount)
     {

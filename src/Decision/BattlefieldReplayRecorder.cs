@@ -183,6 +183,9 @@ public sealed class BattlefieldReplayRecorder : IDisposable
             return cachedCommandEffectivenessSnapshots.ToArray();
     }
 
+    public void ResetDecisionQualityFeedback()
+        => EnqueueWork(ReplayWorkItem.ResetStats());
+
     public void Dispose()
     {
         if (disposed)
@@ -280,6 +283,11 @@ public sealed class BattlefieldReplayRecorder : IDisposable
                 if (item.Kind == ReplayWorkKind.Close)
                 {
                     CloseSession(item.Snapshot, item.Reason);
+                    continue;
+                }
+                if (item.Kind == ReplayWorkKind.ResetStats)
+                {
+                    ResetDecisionQualityFeedbackCore();
                     continue;
                 }
 
@@ -1610,6 +1618,27 @@ public sealed class BattlefieldReplayRecorder : IDisposable
         }
     }
 
+    private void ResetDecisionQualityFeedbackCore()
+    {
+        pendingCommandEvaluations.Clear();
+        commandOutcomeByKind.Clear();
+        lock (statsLock)
+            cachedCommandEffectivenessSnapshots = Array.Empty<BattlefieldCommandEffectivenessSnapshot>();
+        lastRecordedCommandSequence = 0;
+        Volatile.Write(ref pendingEvaluationCount, 0);
+        commandOutcomeStatsLoaded = true;
+        try
+        {
+            var path = ResolveCommandOutcomeStatsPath();
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch (Exception ex)
+        {
+            log.Debug(ex, "[Replay] Failed to delete decision quality stats");
+        }
+    }
+
     private string ResolveCommandOutcomeStatsPath()
         => Path.Combine(ResolveReplayDirectory(), "decision_quality_stats.json");
 
@@ -1708,12 +1737,7 @@ public sealed class BattlefieldReplayRecorder : IDisposable
     }
 
     private string ResolveReplayDirectory()
-        => Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "XIVLauncherCN",
-            "pluginConfigs",
-            "ai02",
-            configuration.Replay.DirectoryName);
+        => BattlefieldReplayStoragePath.ResolveDirectory(configuration.Replay.DirectoryName);
 
     private static string SanitizeFilePart(string value)
     {
@@ -1906,6 +1930,7 @@ public sealed class BattlefieldReplayRecorder : IDisposable
     {
         Frame,
         Close,
+        ResetStats,
         Shutdown,
     }
 
@@ -1919,6 +1944,9 @@ public sealed class BattlefieldReplayRecorder : IDisposable
 
         public static ReplayWorkItem Close(BattlefieldSnapshot? snapshot, string reason)
             => new(ReplayWorkKind.Close, snapshot, reason);
+
+        public static ReplayWorkItem ResetStats()
+            => new(ReplayWorkKind.ResetStats, null, "reset-stats");
 
         public static ReplayWorkItem Shutdown()
             => new(ReplayWorkKind.Shutdown, null, "shutdown");

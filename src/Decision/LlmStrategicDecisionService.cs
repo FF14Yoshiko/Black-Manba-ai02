@@ -54,6 +54,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
     private uint currentMapId;
     private int lastMatchTimeRemaining = -1;
     private long lastRequestTicks = -1;
+    private long lastRoutinePulseTicks = -1;
     private string lastRequestSituationKey = string.Empty;
     private string lastErrorText = string.Empty;
     private LlmGateResult lastRequestGate = LlmGateResult.None("尚未发起 AI 请求");
@@ -277,6 +278,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
                 lastGate = LlmGateResult.None("新战场上下文已开始，等待本地门控");
                 lastErrorText = string.Empty;
                 lastRequestTicks = -1;
+                lastRoutinePulseTicks = -1;
                 lastRequestSituationKey = string.Empty;
                 ClearDebugArtifacts();
                 requestCancellation?.Cancel();
@@ -301,6 +303,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
             lastGate = LlmGateResult.None(reason);
             lastErrorText = string.Empty;
             lastRequestTicks = -1;
+            lastRoutinePulseTicks = -1;
             lastRequestSituationKey = string.Empty;
             ClearDebugArtifacts();
             requestCancellation?.Cancel();
@@ -583,7 +586,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
     {
         long lastRequest;
         lock (sync)
-            lastRequest = lastRequestTicks;
+            lastRequest = lastRoutinePulseTicks;
 
         var scheduling = LlmGateSchedulingPolicy.ApplyRoutinePulseGate(
             BattlefieldLlmDecisionNeedKind.RoutineStrategicPulse,
@@ -593,15 +596,6 @@ public sealed class LlmStrategicDecisionService : IDisposable
             now);
         if (!scheduling.ShouldRequest)
             return LlmGateResult.None(scheduling.WaitReason);
-
-        var evaluation = LlmRoutinePulsePolicy.Evaluate(
-            BattlefieldLlmDecisionNeedKind.RoutineStrategicPulse,
-            config.RoutinePulseEnabled,
-            config.RoutinePulseIntervalSeconds,
-            lastRequest,
-            now);
-        if (!evaluation.IsDue)
-            return LlmGateResult.None($"鍥哄畾灞€鍐呴噰鏍锋湭鍒帮紝璺濈涓嬩竴娆″父瑙勬垬鐣ラ噰鏍疯繕鍓?{evaluation.RemainingSeconds} 绉?");
 
         return BuildGate(
             BattlefieldLlmDecisionNeedKind.RoutineStrategicPulse,
@@ -638,6 +632,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
         failureReason = string.Empty;
         lock (sync)
         {
+            var isRoutinePulse = gate.NeedKind == BattlefieldLlmDecisionNeedKind.RoutineStrategicPulse;
             if (disposed)
             {
                 failureReason = "插件已释放，请重新打开插件后再试。";
@@ -649,7 +644,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
                 return false;
             }
             var minIntervalMs = ResolveMinIntervalMs(config, gate);
-            if (!ignoreRateLimit && lastRequestTicks >= 0 && now - lastRequestTicks < minIntervalMs)
+            if (!ignoreRateLimit && !isRoutinePulse && lastRequestTicks >= 0 && now - lastRequestTicks < minIntervalMs)
             {
                 var remaining = Math.Max(1, (int)Math.Ceiling((minIntervalMs - (now - lastRequestTicks)) / 1000d));
                 failureReason = $"最小请求间隔还没到，请再等 {remaining} 秒。";
@@ -657,6 +652,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
             }
             var sameSituationCooldownMs = ResolveSameSituationCooldownMs(config, gate);
             if (!ignoreRateLimit
+                && !isRoutinePulse
                 && string.Equals(lastRequestSituationKey, gate.SituationKey, StringComparison.Ordinal)
                 && lastRequestTicks >= 0
                 && now - lastRequestTicks < sameSituationCooldownMs)
@@ -667,6 +663,8 @@ public sealed class LlmStrategicDecisionService : IDisposable
             }
 
             lastRequestTicks = now;
+            if (isRoutinePulse)
+                lastRoutinePulseTicks = now;
             lastRequestSituationKey = gate.SituationKey;
             lastErrorText = string.Empty;
             requestCancellation?.Dispose();

@@ -28,6 +28,9 @@
     <Compile Include="..\..\src\Map\MapTacticalGraphModels.cs" Link="Source\Map\MapTacticalGraphModels.cs" />
     <Compile Include="..\..\src\Map\MapRouteRiskEvaluator.cs" Link="Source\Map\MapRouteRiskEvaluator.cs" />
     <Compile Include="..\..\src\Decision\TacticalDecisionEngineService.cs" Link="Source\Decision\TacticalDecisionEngineService.cs" />
+    <Compile Include="..\..\src\Decision\AiTeacherLearningService.cs" Link="Source\Decision\AiTeacherLearningService.cs" />
+    <Compile Include="..\..\src\Decision\DecisionQualityFeedbackFusion.cs" Link="Source\Decision\DecisionQualityFeedbackFusion.cs" />
+    <Compile Include="..\..\src\Decision\StrategicTargetResolutionLearningPolicy.cs" Link="Source\Decision\StrategicTargetResolutionLearningPolicy.cs" />
     <Compile Include="..\..\src\Decision\LlmDecisionResponseParser.cs" Link="Source\Decision\LlmDecisionResponseParser.cs" />
     <Compile Include="..\..\src\Decision\LlmGateSchedulingPolicy.cs" Link="Source\Decision\LlmGateSchedulingPolicy.cs" />
     <Compile Include="..\..\src\Decision\LlmRoutinePulsePolicy.cs" Link="Source\Decision\LlmRoutinePulsePolicy.cs" />

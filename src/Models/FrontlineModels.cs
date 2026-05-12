@@ -1393,6 +1393,38 @@ public readonly record struct BattlefieldCommandEffectivenessSnapshot(
     float Modifier,
     string SummaryText);
 
+public readonly record struct BattlefieldAiTeacherTargetResolutionSnapshot(
+    StrategicTargetResolutionKind Kind,
+    string TargetKey,
+    string TargetName,
+    int SampleCount,
+    float AverageScore,
+    float PositiveRate,
+    float Modifier,
+    string SummaryText);
+
+public readonly record struct BattlefieldAiTeacherRecentLearningSnapshot(
+    long ObservedAtTicks,
+    FrontlineMapType MapType,
+    string Category,
+    string Label,
+    float OutcomeScore,
+    int WindowSeconds,
+    string SummaryText);
+
+public sealed class BattlefieldAiTeacherLearningStatusSnapshot
+{
+    public bool Enabled { get; init; }
+    public FrontlineMapType MapType { get; init; }
+    public string StatsPath { get; init; } = string.Empty;
+    public int CommandSampleCount { get; init; }
+    public int TargetResolutionSampleCount { get; init; }
+    public BattlefieldCommandEffectivenessSnapshot[] CommandEffectiveness { get; init; } = Array.Empty<BattlefieldCommandEffectivenessSnapshot>();
+    public BattlefieldAiTeacherTargetResolutionSnapshot[] TargetResolutions { get; init; } = Array.Empty<BattlefieldAiTeacherTargetResolutionSnapshot>();
+    public BattlefieldAiTeacherRecentLearningSnapshot[] RecentLearned { get; init; } = Array.Empty<BattlefieldAiTeacherRecentLearningSnapshot>();
+    public string StatusText { get; init; } = "\u6682\u65e0 AI \u8001\u5e08\u5b66\u4e60\u6837\u672c";
+}
+
 public readonly record struct BattlefieldEnemyIntentPredictionSnapshot(
     BattlefieldEnemyIntentKind Kind,
     byte? Battalion,

@@ -2,7 +2,7 @@
   "Author": "肘击",
   "Name": "前线战术指挥",
   "InternalName": "ai02",
-  "AssemblyVersion": "1.2.0.0",
+  "AssemblyVersion": "1.2.1.0",
   "Description": "纷争前线的战场态势感知、战术决策与战斗指挥界面。",
   "ApplicableVersion": "any",
   "Tags": ["frontline", "radar", "decision-support", "pvp"],

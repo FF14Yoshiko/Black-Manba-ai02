@@ -2,6 +2,13 @@
 
 All notable changes to this plugin will be documented in this file.
 
+## 1.2.1 - 2026-05-13
+
+- Refactored the oversized MainWindow into clearer partial modules while preserving the existing toolchain, review surfaces, and in-match controls.
+- Added AI teacher learning for command and target resolution feedback, including map-separated samples, replay-backed persistence, and regression coverage for the learning path.
+- Improved LLM scheduling and overlay behavior with routine pulse gating, stronger AI-led HUD signaling, and better display stickiness for AI directives.
+- Continued cleanup of retired features and stale UI wording so removed systems no longer leak into the current workflow.
+
 ## 1.2.0 - 2026-05-12
 
 - Promoted LLM battlefield reads into a more practical in-match workflow with fixed strategic pulses, event-priority gating, and clearer AI-led command display controls.

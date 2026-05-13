@@ -1185,7 +1185,13 @@ public sealed class WorldStateService : IDisposable
     {
         var knowledge = FrontlineKnowledgeBase.GetSnapshot(clientState.TerritoryType, clientState.MapId);
         var mapType = knowledge.CurrentMap?.MapType ?? FrontlineMapType.Unknown;
-        var isInFrontline = latestSnapshot.IsInFrontline || knowledge.CurrentMap != null;
+        var latestSnapshotMatchesCurrentMap = latestSnapshot.TerritoryType == clientState.TerritoryType
+            && latestSnapshot.MapId == clientState.MapId;
+        var isInFrontline = FrontlinePresenceResolver.Resolve(
+            scoreReader.IsInFrontline(),
+            latestSnapshot.IsInFrontline,
+            latestSnapshotMatchesCurrentMap,
+            knowledge.CurrentMap != null);
         if (!isInFrontline)
         {
             ClearIncrementalObjectScanCache();

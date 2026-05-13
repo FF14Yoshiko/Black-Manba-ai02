@@ -3,9 +3,9 @@
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
-    <Version>1.2.2</Version>
-    <AssemblyVersion>1.2.2.0</AssemblyVersion>
-    <FileVersion>1.2.2.0</FileVersion>
+    <Version>1.2.3</Version>
+    <AssemblyVersion>1.2.3.0</AssemblyVersion>
+    <FileVersion>1.2.3.0</FileVersion>
     <AssemblyTitle>前线战术指挥</AssemblyTitle>
     <Product>前线战术指挥</Product>
     <Description>纷争前线的战场态势感知、战术决策与战斗指挥界面。</Description>

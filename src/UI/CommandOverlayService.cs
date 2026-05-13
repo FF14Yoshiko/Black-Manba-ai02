@@ -21,10 +21,6 @@ public sealed class CommandOverlayService : IDisposable
 
     private readonly Configuration configuration;
     private readonly IUiBuilder uiBuilder;
-    private int lastPublishedSequence;
-    private long lastPublishedTicks = -1;
-    private string lastPublishedBattleText = string.Empty;
-    private BattlefieldCommandSnapshot? lastPublishedBattleCommand;
     private BattlefieldPriorityTargetSnapshot? pinnedObjectiveTarget;
     private long pinnedObjectiveUpdatedAtTicks = -1;
     private CommandOverlayDirectiveDisplaySnapshot? heldAiDirectiveDisplay;
@@ -59,7 +55,6 @@ public sealed class CommandOverlayService : IDisposable
         EnsureOverlayFonts(config);
 
         var now = Environment.TickCount64;
-        CapturePublishedCommand(snapshot.Decision.CommandSituation, now, config);
         if (!TryResolveDisplayContent(snapshot, now, config, out var content))
             return;
 
@@ -69,30 +64,11 @@ public sealed class CommandOverlayService : IDisposable
     public void Dispose()
     {
         disposed = true;
-        lastPublishedBattleText = string.Empty;
-        lastPublishedBattleCommand = null;
         pinnedObjectiveTarget = null;
         pinnedObjectiveUpdatedAtTicks = -1;
         heldAiDirectiveDisplay = null;
         heldAiDirectiveTicks = -1;
         DisposeOverlayFonts();
-    }
-
-    private void CapturePublishedCommand(
-        BattlefieldCommandSituationSnapshot commands,
-        long now,
-        CommandOverlayConfiguration config)
-    {
-        if (!commands.Publish.ShouldAnnounce || string.IsNullOrWhiteSpace(commands.Publish.SpeakText))
-            return;
-
-        if (commands.Publish.Sequence == lastPublishedSequence && !string.IsNullOrWhiteSpace(lastPublishedBattleText))
-            return;
-
-        lastPublishedSequence = commands.Publish.Sequence;
-        lastPublishedTicks = now;
-        lastPublishedBattleCommand = commands.Publish.Command;
-        lastPublishedBattleText = commands.Publish.SpeakText.Trim();
     }
 
     private bool TryResolveDisplayContent(
@@ -101,10 +77,16 @@ public sealed class CommandOverlayService : IDisposable
         CommandOverlayConfiguration config,
         out OverlayDisplayContent content)
     {
-        var directives = new CommandOverlayDirectiveDisplaySnapshot(
-            ResolveOverlayPrimaryCommandText(snapshot.Decision),
-            BuildOverlayCurrentActionText(snapshot.Decision),
-            CommandOverlayAiDisplayPolicy.IsAiLead(snapshot.Decision));
+        var hasFreshAiText = TryResolveFreshAiDisplay(snapshot.LlmStrategicDecision, out var aiPrimaryLine, out var aiSecondaryLine);
+        var directives = hasFreshAiText
+            ? new CommandOverlayDirectiveDisplaySnapshot(
+                aiPrimaryLine,
+                aiSecondaryLine,
+                true)
+            : new CommandOverlayDirectiveDisplaySnapshot(
+                ResolveOverlayPrimaryCommandText(snapshot.Decision),
+                BuildOverlayCurrentActionText(snapshot.Decision),
+                CommandOverlayAiDisplayPolicy.IsAiLead(snapshot.Decision));
         directives = CommandOverlayAiDisplayPolicy.ResolveDisplay(
             directives,
             now,
@@ -117,6 +99,25 @@ public sealed class CommandOverlayService : IDisposable
             directives.CurrentActionLine,
             BuildOverlayThreatText(snapshot),
             directives.IsAiLead);
+        return true;
+    }
+
+    private static bool TryResolveFreshAiDisplay(
+        BattlefieldLlmStrategicDecisionSnapshot llmDecision,
+        out string primaryLine,
+        out string secondaryLine)
+    {
+        primaryLine = string.Empty;
+        secondaryLine = string.Empty;
+        if (!llmDecision.IsAvailable || !llmDecision.IsFresh)
+            return false;
+
+        var primaryText = LlmStrategicTextResolver.ResolvePrimaryDisplayText(llmDecision);
+        if (string.IsNullOrWhiteSpace(primaryText))
+            return false;
+
+        primaryLine = CleanOverlayAiDirectiveText(primaryText);
+        secondaryLine = ResolveAiSecondaryDisplayText(llmDecision, primaryLine);
         return true;
     }
 
@@ -258,6 +259,19 @@ public sealed class CommandOverlayService : IDisposable
         return PreserveOverlayText(value, OverlayDisplayMaxChars);
     }
 
+    private static string CleanOverlayAiDirectiveText(string? text)
+        => PreserveOverlayText(text, OverlayDisplayMaxChars);
+
+    private static string ResolveAiSecondaryDisplayText(
+        BattlefieldLlmStrategicDecisionSnapshot llmDecision,
+        string primaryLine)
+    {
+        if (!string.IsNullOrWhiteSpace(llmDecision.ShortReason))
+            return CleanOverlayAiDirectiveText(llmDecision.ShortReason);
+
+        return primaryLine;
+    }
+
     private static string StripOverlayTimingDetails(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
@@ -377,13 +391,12 @@ public sealed class CommandOverlayService : IDisposable
         long now,
         CommandOverlayConfiguration config)
     {
+        _ = now;
         var decision = snapshot.Decision;
         var commands = decision.CommandSituation;
-        var holdMs = config.PublishedHoldSeconds * 1000L;
-        if (lastPublishedBattleCommand.HasValue
-            && lastPublishedTicks >= 0
-            && now - lastPublishedTicks <= holdMs)
-            return PreserveOverlayText(lastPublishedBattleText, HudPrimaryMaxChars);
+        var aiDisplayText = ResolveFreshAiHudText(snapshot.LlmStrategicDecision);
+        if (!string.IsNullOrWhiteSpace(aiDisplayText))
+            return aiDisplayText;
 
         if (commands.EmergencyCommand.HasValue)
             return PreserveOverlayText(commands.EmergencyCommand.Value.CommandText, HudPrimaryMaxChars);
@@ -411,6 +424,14 @@ public sealed class CommandOverlayService : IDisposable
             return PreserveOverlayText(decision.RecommendedAction, HudPrimaryMaxChars);
 
         return config.ShowPrimaryWhenIdle ? "主团跟我，等下一条指令" : string.Empty;
+    }
+
+    private static string ResolveFreshAiHudText(BattlefieldLlmStrategicDecisionSnapshot llmDecision)
+    {
+        if (!llmDecision.IsAvailable || !llmDecision.IsFresh)
+            return string.Empty;
+
+        return PreserveOverlayText(LlmStrategicTextResolver.ResolvePrimaryDisplayText(llmDecision), HudPrimaryMaxChars);
     }
 
     private static string BuildHudContextLine(
@@ -1044,12 +1065,8 @@ public sealed class CommandOverlayService : IDisposable
         long now,
         CommandOverlayConfiguration config)
     {
+        _ = now;
         var commands = decision.CommandSituation;
-        var holdMs = config.PublishedHoldSeconds * 1000L;
-        if (!string.IsNullOrWhiteSpace(lastPublishedBattleText)
-            && lastPublishedTicks >= 0
-            && now - lastPublishedTicks <= holdMs)
-            return $"指令：{lastPublishedBattleText}";
 
         if (!config.ShowPrimaryWhenIdle)
             return string.Empty;
@@ -1066,14 +1083,9 @@ public sealed class CommandOverlayService : IDisposable
         long now,
         CommandOverlayConfiguration config)
     {
+        _ = now;
         var commands = decision.CommandSituation;
         var fightTarget = ShortTargetName(decision.FightPriorityTarget?.TargetName, 10);
-        var holdMs = config.PublishedHoldSeconds * 1000L;
-        if (lastPublishedBattleCommand.HasValue
-            && !string.IsNullOrWhiteSpace(lastPublishedBattleText)
-            && lastPublishedTicks >= 0
-            && now - lastPublishedTicks <= holdMs)
-            return BuildBattleLineText(BuildCompactCommandText(lastPublishedBattleCommand.Value, fightTarget), fightTarget);
 
         foreach (var command in commands.Commands)
         {

@@ -2,6 +2,13 @@
 
 All notable changes to this plugin will be documented in this file.
 
+## 1.2.3 - 2026-05-14
+
+- Preserved the AI's original strategic reply as the primary overlay, HUD, and published command text instead of rewriting it into shorter local phrases.
+- Removed the separate "recent published text" hold behavior so visible command text now follows the freshest AI directive or live local command state directly.
+- Fixed Frontline entry detection so live in-match reads can recover as soon as the zone is recognized, without requiring a plugin restart after entering.
+- Added regression coverage for AI text selection and Frontline presence resolution to catch these display and zone-state failures before release.
+
 ## 1.2.2 - 2026-05-14
 
 - Fixed the 25-second in-match LLM routine pulse so high-pressure local combat states no longer suppress fixed strategic sampling.

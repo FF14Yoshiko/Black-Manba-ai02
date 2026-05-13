@@ -668,6 +668,92 @@ public sealed class StrategicArbitrationServiceTests
         Assert.Equal(expectedTargetName, result.ObjectivePriorityTarget.Value.TargetName);
     }
 
+    [Fact]
+    public void Apply_PreservesFullAiDecisionTextAcrossDisplayOutputs()
+    {
+        var service = new StrategicArbitrationService();
+        var localObjective = BattlefieldTestFactory.ObjectivePriority(
+            "danger-node",
+            "Danger Node",
+            BattlefieldMapObjectiveCategory.Tomelith,
+            BattlefieldMapObjectiveState.Active,
+            new Vector3(40f, 0f, 12f),
+            42f,
+            5,
+            40f,
+            78f,
+            recommendedAction: "Contest Danger Node");
+        var aiObjective = BattlefieldTestFactory.ObjectivePriority(
+            "safe-node",
+            "Safe Node",
+            BattlefieldMapObjectiveCategory.Tomelith,
+            BattlefieldMapObjectiveState.Active,
+            new Vector3(90f, 0f, 60f),
+            94f,
+            10,
+            24f,
+            88f,
+            recommendedAction: "Rotate Safe Node");
+
+        var localCommand = BattlefieldTestFactory.Command(
+            "local:contest:danger",
+            BattlefieldCommandKind.ContestObjective,
+            "Contest Danger Node",
+            localObjective.Position,
+            localObjective.Name,
+            score: 86f,
+            urgency: 80f);
+        var localAction = BattlefieldTestFactory.Action(
+            "local:action:contest:danger",
+            localCommand.Id,
+            BattlefieldActionType.ContestObjective,
+            BattlefieldCommandKind.ContestObjective,
+            "Contest Danger Node",
+            localObjective.Position,
+            localObjective.ObjectiveId,
+            localObjective.Name,
+            priority: 86f,
+            confidence: 80f,
+            urgency: 80f,
+            etaSeconds: localObjective.MountedEtaSeconds);
+
+        var localDecision = CreateDecision(
+            new BattlefieldRiskAssessmentSnapshot { OverallRisk = 38f, CombatRisk = 34f },
+            localCommand,
+            localAction,
+            canPublish: true,
+            commands: [localCommand],
+            actions: [localAction],
+            objectivePriorities: [localObjective, aiObjective],
+            primaryObjective: localObjective,
+            objectiveTarget: BattlefieldTestFactory.PriorityTarget("Local", localObjective.Name, localAction.Text, localObjective.Position));
+        var snapshot = CreateSnapshot(localDecision);
+        const string fullDecision = "Rotate to Safe Node, hold the ridge, and do not overcommit before their backline shows.";
+        var llmDecision = new BattlefieldLlmStrategicDecisionSnapshot
+        {
+            IsAvailable = true,
+            IsFresh = true,
+            ActionType = "rotate",
+            Decision = fullDecision,
+            RecommendedAction = "Rotate Safe Node",
+            PriorityTarget = "Safe Node",
+            Confidence = 91f,
+            Risk = 26f,
+            ReceivedAtTicks = 51001
+        };
+
+        var result = service.Apply(snapshot, localDecision, llmDecision);
+
+        Assert.Equal(fullDecision, result.RecommendedAction);
+        Assert.True(result.PrimaryAction.HasValue);
+        Assert.Equal(fullDecision, result.PrimaryAction.Value.Text);
+        Assert.True(result.CommandSituation.PrimaryCommand.HasValue);
+        Assert.Equal(fullDecision, result.CommandSituation.PrimaryCommand.Value.CommandText);
+        Assert.Equal(fullDecision, result.CommandSituation.Publish.SpeakText);
+        Assert.True(result.ObjectivePriorityTarget.HasValue);
+        Assert.Equal("Safe Node", result.ObjectivePriorityTarget.Value.TargetName);
+    }
+
     private static BattlefieldDecisionSnapshot CreateDecision(
         BattlefieldRiskAssessmentSnapshot risk,
         BattlefieldCommandSnapshot primaryCommand,

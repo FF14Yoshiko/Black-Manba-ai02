@@ -538,7 +538,6 @@ public class CommandOverlayConfiguration
     public float Width { get; set; } = 1396.311f;
     public float Height { get; set; } = 366.214f;
     public float FontScale { get; set; } = 3.002f;
-    public int PublishedHoldSeconds { get; set; } = 5;
     public int AiLeadHoldSeconds { get; set; } = 5;
     public float TextColorR { get; set; } = 1f;
     public float TextColorG { get; set; } = 0.86f;
@@ -558,7 +557,6 @@ public class CommandOverlayConfiguration
         Width = Math.Clamp(Width, 260f, 2400f);
         Height = Math.Clamp(Height, 80f, 900f);
         FontScale = Math.Clamp(FontScale, 0.8f, 5f);
-        PublishedHoldSeconds = Math.Clamp(PublishedHoldSeconds, 1, 20);
         AiLeadHoldSeconds = Math.Clamp(AiLeadHoldSeconds, 0, 20);
         TextColorR = Math.Clamp(TextColorR, 0f, 1f);
         TextColorG = Math.Clamp(TextColorG, 0f, 1f);

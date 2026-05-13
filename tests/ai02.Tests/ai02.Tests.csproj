@@ -23,7 +23,9 @@
   <ItemGroup>
     <Compile Include="..\..\src\Models\FrontlineModels.cs" Link="Source\Models\FrontlineModels.cs" />
     <Compile Include="..\..\src\Models\PlayerFrameEventModels.cs" Link="Source\Models\PlayerFrameEventModels.cs" />
+    <Compile Include="..\..\src\Decision\FrontlinePresenceResolver.cs" Link="Source\Decision\FrontlinePresenceResolver.cs" />
     <Compile Include="..\..\src\Decision\StrategicArbitrationService.cs" Link="Source\Decision\StrategicArbitrationService.cs" />
+    <Compile Include="..\..\src\Decision\LlmStrategicTextResolver.cs" Link="Source\Decision\LlmStrategicTextResolver.cs" />
     <Compile Include="..\..\src\Map\MapAnnotationService.cs" Link="Source\Map\MapAnnotationService.cs" />
     <Compile Include="..\..\src\Map\MapTacticalGraphDocuments.cs" Link="Source\Map\MapTacticalGraphDocuments.cs" />
     <Compile Include="..\..\src\Map\MapTacticalGraphModels.cs" Link="Source\Map\MapTacticalGraphModels.cs" />

@@ -69,7 +69,6 @@ public partial class MainWindow
                     changed |= DrawSliderFloat("大字区域宽度", commandOverlay.Width, 260f, 1800f, value => commandOverlay.Width = value);
                     changed |= DrawSliderFloat("大字区域高度", commandOverlay.Height, 80f, 520f, value => commandOverlay.Height = value);
                     changed |= DrawSliderFloat("大字字号", commandOverlay.FontScale, 0.8f, 5f, value => commandOverlay.FontScale = value);
-                    changed |= DrawSliderInt("发布后停留秒数", commandOverlay.PublishedHoldSeconds, 1, 20, value => commandOverlay.PublishedHoldSeconds = value);
                     changed |= DrawSliderInt("AI 主导锁定秒数", commandOverlay.AiLeadHoldSeconds, 0, 20, value => commandOverlay.AiLeadHoldSeconds = value);
                     changed |= DrawColorEdit("大字文字颜色", new Vector4(commandOverlay.TextColorR, commandOverlay.TextColorG, commandOverlay.TextColorB, 1f), value =>
                     {
@@ -97,7 +96,6 @@ public partial class MainWindow
                         commandOverlay.Width = 980f;
                         commandOverlay.Height = 150f;
                         commandOverlay.FontScale = 2.0f;
-                        commandOverlay.PublishedHoldSeconds = 5;
                         commandOverlay.AiLeadHoldSeconds = 5;
                         commandOverlay.AiTextColorR = 0.35f;
                         commandOverlay.AiTextColorG = 0.82f;

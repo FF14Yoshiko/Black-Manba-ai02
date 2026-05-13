@@ -59,7 +59,7 @@ public sealed class StrategicArbitrationService
                 ActionHoldRemainingSeconds = Math.Max(3, aiAction.HoldSeconds),
                 ActionHoldReason = "AI 战术接管主指令",
                 Publish = publish,
-                SummaryText = $"AI 主导：{displayText}；{BuildReasonText(llmDecision, directive)}"
+                SummaryText = $"AI 主导：{displayText}；{BuildReasonDisplayText(llmDecision, directive)}"
             },
             ActionCandidates = actions,
             PrimaryAction = aiAction,
@@ -114,7 +114,7 @@ public sealed class StrategicArbitrationService
         BattlefieldDecisionSnapshot localDecision,
         BattlefieldLlmStrategicDecisionSnapshot llmDecision)
     {
-        var rawText = ResolveDirectiveSourceText(llmDecision);
+        var rawText = LlmStrategicTextResolver.ResolveDirectiveSourceText(llmDecision);
         if (!TryResolveActionType(llmDecision, rawText, out var actionType))
             return default;
 
@@ -132,17 +132,6 @@ public sealed class StrategicArbitrationService
             commandKind,
             target,
             ResolvePurpose(actionType));
-    }
-
-    private static string ResolveDirectiveSourceText(BattlefieldLlmStrategicDecisionSnapshot llmDecision)
-    {
-        if (!string.IsNullOrWhiteSpace(llmDecision.RecommendedAction))
-            return llmDecision.RecommendedAction.Trim();
-        if (!string.IsNullOrWhiteSpace(llmDecision.Decision))
-            return llmDecision.Decision.Trim();
-        if (!string.IsNullOrWhiteSpace(llmDecision.ActionType))
-            return llmDecision.ActionType.Trim();
-        return string.Empty;
     }
 
     private static bool TryResolveActionType(
@@ -629,10 +618,9 @@ public sealed class StrategicArbitrationService
         StrategicDirective directive,
         BattlefieldActionCandidateSnapshot? matchedAction)
     {
-        if (!string.IsNullOrWhiteSpace(llmDecision.RecommendedAction))
-            return llmDecision.RecommendedAction.Trim();
-        if (!string.IsNullOrWhiteSpace(llmDecision.Decision) && llmDecision.Decision.Length <= 60)
-            return llmDecision.Decision.Trim();
+        var aiDisplayText = LlmStrategicTextResolver.ResolvePrimaryDisplayText(llmDecision);
+        if (!string.IsNullOrWhiteSpace(aiDisplayText))
+            return aiDisplayText;
         if (matchedAction.HasValue && !string.IsNullOrWhiteSpace(matchedAction.Value.Text))
             return matchedAction.Value.Text;
         return directive.FallbackText;
@@ -713,7 +701,7 @@ public sealed class StrategicArbitrationService
             eta,
             holdSeconds,
             directive.PurposeText,
-            BuildReasonText(llmDecision, directive),
+            BuildReasonDisplayText(llmDecision, directive),
             BuildEvidenceText(llmDecision, localDecision),
             ResolveFailureCondition(directive.ActionType));
     }
@@ -760,7 +748,7 @@ public sealed class StrategicArbitrationService
             Math.Max(4, aiAction.HoldSeconds),
             aiAction.Destination,
             targetName,
-            BuildReasonText(llmDecision, directive),
+            BuildReasonDisplayText(llmDecision, directive),
             BuildEvidenceText(llmDecision, localDecision));
     }
 
@@ -825,7 +813,7 @@ public sealed class StrategicArbitrationService
             aiAction.Priority,
             aiAction.Urgency,
             aiAction.Destination,
-            BuildReasonText(llmDecision, directive),
+            BuildReasonDisplayText(llmDecision, directive),
             BuildEvidenceText(llmDecision, localDecision));
     }
 
@@ -845,7 +833,7 @@ public sealed class StrategicArbitrationService
             aiAction.Priority,
             aiAction.Urgency,
             aiAction.Destination,
-            BuildReasonText(llmDecision, directive),
+            BuildReasonDisplayText(llmDecision, directive),
             BuildEvidenceText(llmDecision, localDecision));
     }
 
@@ -859,10 +847,14 @@ public sealed class StrategicArbitrationService
             && string.Equals(left.TargetId, right.TargetId, StringComparison.Ordinal)
             && string.Equals(left.TargetName, right.TargetName, StringComparison.Ordinal);
 
-    private static string BuildReasonText(BattlefieldLlmStrategicDecisionSnapshot llmDecision, StrategicDirective directive)
-        => !string.IsNullOrWhiteSpace(llmDecision.ShortReason)
-            ? $"AI 理由：{llmDecision.ShortReason}"
-            : $"AI 战术：{directive.RawText}";
+    private static string BuildReasonDisplayText(BattlefieldLlmStrategicDecisionSnapshot llmDecision, StrategicDirective directive)
+    {
+        if (!string.IsNullOrWhiteSpace(llmDecision.ShortReason))
+            return $"AI 理由：{llmDecision.ShortReason}";
+
+        var aiDisplayText = LlmStrategicTextResolver.ResolvePrimaryDisplayText(llmDecision);
+        return $"AI 战术：{(string.IsNullOrWhiteSpace(aiDisplayText) ? directive.RawText : aiDisplayText)}";
+    }
 
     private static string BuildEvidenceText(
         BattlefieldLlmStrategicDecisionSnapshot llmDecision,

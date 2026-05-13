@@ -11,7 +11,7 @@ namespace ai02;
 [Serializable]
 public class Configuration : IPluginConfiguration
 {
-    private const int CurrentVersion = 25;
+    private const int CurrentVersion = 26;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
@@ -248,6 +248,13 @@ public class Configuration : IPluginConfiguration
         if (Version < 25)
         {
             LlmDecision ??= new LlmDecisionConfiguration();
+            migrated = true;
+        }
+        if (Version < 26)
+        {
+            CommandOverlay ??= new CommandOverlayConfiguration();
+            if (CommandOverlay.AiLeadHoldSeconds == 6)
+                CommandOverlay.AiLeadHoldSeconds = 5;
             migrated = true;
         }
 
@@ -532,7 +539,7 @@ public class CommandOverlayConfiguration
     public float Height { get; set; } = 366.214f;
     public float FontScale { get; set; } = 3.002f;
     public int PublishedHoldSeconds { get; set; } = 5;
-    public int AiLeadHoldSeconds { get; set; } = 6;
+    public int AiLeadHoldSeconds { get; set; } = 5;
     public float TextColorR { get; set; } = 1f;
     public float TextColorG { get; set; } = 0.86f;
     public float TextColorB { get; set; } = 0.22f;
@@ -830,4 +837,3 @@ public class BattlefieldAnnouncementConfiguration
 {
     public bool ShowDebugInfo { get; set; }
 }
-

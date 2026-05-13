@@ -38,6 +38,8 @@ public sealed class MapTacticalAnalysisService
         IReadOnlyList<BattlefieldMapVisionClusterSnapshot> mapVisionClusters,
         IReadOnlyList<BattlefieldMapObjectiveSnapshot> mapObjectives,
         BattlefieldTeamSituationSnapshot teamSituation,
+        BattlefieldTimeSituationSnapshot timeSituation,
+        BattlefieldAnnouncementSituationSnapshot announcements,
         BattlefieldChatEventSituationSnapshot chatEvents,
         long now)
     {
@@ -93,11 +95,36 @@ public sealed class MapTacticalAnalysisService
                 .ThenBy(route => route.RouteId, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
 
-        var currentRecommendation = ResolveCurrentRecommendation(zones, routes, heatPoints, teamSituation);
         var staticDangerCount = zones.Count(zone => zone.StaticRisk >= 55f);
         var dynamicDangerCount = zones.Count(zone => zone.DynamicRisk >= 55f)
             + heatPoints.Count(point => point.Intensity >= 55f);
         var mandatoryChokeCount = zones.Count(zone => zone.IsMandatoryChoke);
+        var highGroundCount = zones.Count(zone => zone.Kind == MapAnnotationKind.HighGround);
+        var lowGroundCount = zones.Count(zone => zone.Kind == MapAnnotationKind.LowGround);
+        var jumpPadCount = zones.Count(zone => zone.Kind == MapAnnotationKind.JumpPad);
+        var teleporterCount = zones.Count(zone => zone.Kind == MapAnnotationKind.Teleporter);
+        var flankEntryCount = zones.Count(zone => zone.Kind == MapAnnotationKind.Flank);
+        var bridgeCount = zones.Count(zone => zone.Kind == MapAnnotationKind.Bridge);
+        var underpassCount = zones.Count(zone => zone.Kind == MapAnnotationKind.Underpass);
+        var oneWayPassageCount = graphPaths.Count(path => path.IsOneWay);
+        var semantics = MapTacticalSemanticsBuilder.Build(
+            builtInGraph?.MapType ?? FrontlineMapType.Unknown,
+            zones,
+            routes,
+            heatPoints,
+            mapObjectives,
+            timeSituation,
+            announcements,
+            highGroundCount,
+            lowGroundCount,
+            jumpPadCount,
+            teleporterCount,
+            flankEntryCount,
+            bridgeCount,
+            underpassCount,
+            mandatoryChokeCount,
+            oneWayPassageCount,
+            teamSituation);
 
         return new BattlefieldMapTacticsSnapshot
         {
@@ -114,13 +141,37 @@ public sealed class MapTacticalAnalysisService
             StaticDangerCount = staticDangerCount,
             DynamicDangerCount = dynamicDangerCount,
             MandatoryChokeCount = mandatoryChokeCount,
+            HighGroundCount = highGroundCount,
+            LowGroundCount = lowGroundCount,
+            JumpPadCount = jumpPadCount,
+            TeleporterCount = teleporterCount,
+            FlankEntryCount = flankEntryCount,
+            BridgeCount = bridgeCount,
+            UnderpassCount = underpassCount,
+            OneWayPassageCount = oneWayPassageCount,
             TopZones = zones.Take(10).ToArray(),
             Routes = routes.Take(12).ToArray(),
             HeatPoints = heatPoints,
             FriendlyObservedPath = BuildObservedPathSnapshot(territoryType, mapId, BattlefieldTacticalSide.Friendly),
             EnemyObservedPath = BuildObservedPathSnapshot(territoryType, mapId, BattlefieldTacticalSide.Enemy),
-            CurrentRecommendation = currentRecommendation,
-            SummaryText = BuildSummary(builtInPoints.Length, manualPoints.Length, points.Length, zones.Length, heatPoints.Length, staticDangerCount, dynamicDangerCount, mandatoryChokeCount, currentRecommendation)
+            DangerSummaryText = semantics.DangerSummaryText,
+            TerrainAdvantageSummaryText = semantics.TerrainAdvantageSummaryText,
+            PassabilitySummaryText = semantics.PassabilitySummaryText,
+            RewardModelSummaryText = semantics.RewardModelSummaryText,
+            MapKnowledgeFocusText = semantics.MapKnowledgeFocusText,
+            CurrentRecommendation = semantics.CurrentRecommendation,
+            SummaryText = BuildSummary(
+                builtInPoints.Length,
+                manualPoints.Length,
+                points.Length,
+                zones.Length,
+                heatPoints.Length,
+                staticDangerCount,
+                dynamicDangerCount,
+                mandatoryChokeCount,
+                highGroundCount,
+                oneWayPassageCount,
+                semantics.CurrentRecommendation)
         };
     }
 
@@ -274,64 +325,13 @@ public sealed class MapTacticalAnalysisService
         IReadOnlyList<BattlefieldMapTacticalZoneSnapshot> zones,
         IReadOnlyList<BattlefieldMapHeatPointSnapshot> heatPoints,
         string prefixEvidence)
-    {
-        var distance = 0f;
-        var staticRisk = 0f;
-        var dynamicRisk = 0f;
-        var crossesDanger = false;
-        var crossesMandatoryChoke = false;
-
-        for (var i = 0; i < positions.Count; i++)
-        {
-            if (i > 0)
-                distance += Distance2D(positions[i - 1], positions[i]);
-
-            var sample = positions[i];
-            var nearbyZones = zones.Where(zone => Distance2D(zone.Position, sample) <= MathF.Max(zone.Radius, 18f) + 12f).ToArray();
-            if (nearbyZones.Length > 0)
-            {
-                staticRisk = MathF.Max(staticRisk, nearbyZones.Max(zone => zone.StaticRisk));
-                dynamicRisk = MathF.Max(dynamicRisk, nearbyZones.Max(zone => zone.DynamicRisk));
-                crossesDanger |= nearbyZones.Any(zone => zone.Kind is MapAnnotationKind.Danger or MapAnnotationKind.LowGround or MapAnnotationKind.Underpass || zone.TotalRisk >= 68f);
-                crossesMandatoryChoke |= nearbyZones.Any(zone => zone.IsMandatoryChoke);
-            }
-
-            var nearbyHeat = heatPoints
-                .Where(heat => Distance2D(heat.Position, sample) <= heat.Radius + 18f)
-                .Select(heat => heat.Intensity)
-                .DefaultIfEmpty(0f)
-                .Max();
-            dynamicRisk = MathF.Max(dynamicRisk, nearbyHeat);
-        }
-
-        var totalRisk = Math.Clamp(staticRisk * 0.45f + dynamicRisk * 0.55f, 0f, 100f);
-        var recommendation = totalRisk >= 75f
-            ? "绕路"
-            : crossesDanger || totalRisk >= 55f
-                ? "谨慎通过"
-                : crossesMandatoryChoke
-                    ? "可控卡点"
-                    : "可走";
-
-        var evidence = $"{(string.IsNullOrWhiteSpace(prefixEvidence) ? string.Empty : $"{prefixEvidence}；")}距离 {distance:0}y；静态风险 {staticRisk:0}；动态风险 {dynamicRisk:0}"
-            + (crossesDanger ? "；经过危险/低地/桥洞" : string.Empty)
-            + (crossesMandatoryChoke ? "；包含必卡点" : string.Empty);
-
-        return new BattlefieldMapTacticalRouteSnapshot(
+        => MapRouteRiskEvaluator.Evaluate(
             routeId,
             kindSummary,
-            positions.Count,
-            distance,
-            EstimateEtaSeconds(distance, MountedYalmsPerSecond),
-            EstimateEtaSeconds(distance, OnFootYalmsPerSecond),
-            staticRisk,
-            dynamicRisk,
-            totalRisk,
-            crossesDanger,
-            crossesMandatoryChoke,
-            recommendation,
-            evidence);
-    }
+            positions,
+            zones,
+            heatPoints,
+            prefixEvidence);
 
     private static NavigationGraph BuildNavigationGraph(
         IReadOnlyList<MapTacticalPathSnapshot> graphPaths,
@@ -727,39 +727,6 @@ public sealed class MapTacticalAnalysisService
         return "可用";
     }
 
-    private static string ResolveCurrentRecommendation(
-        IReadOnlyList<BattlefieldMapTacticalZoneSnapshot> zones,
-        IReadOnlyList<BattlefieldMapTacticalRouteSnapshot> routes,
-        IReadOnlyList<BattlefieldMapHeatPointSnapshot> heatPoints,
-        BattlefieldTeamSituationSnapshot teamSituation)
-    {
-        var forcedDetour = zones.FirstOrDefault(zone => zone.Recommendation.Contains("强制绕路", StringComparison.Ordinal));
-        if (!string.IsNullOrWhiteSpace(forcedDetour.Id))
-            return $"绕开 {forcedDetour.Label}：敌方人数/动态风险占优";
-
-        var chokeFight = zones.FirstOrDefault(zone => zone.Recommendation.Contains("卡口接团", StringComparison.Ordinal));
-        if (!string.IsNullOrWhiteSpace(chokeFight.Id))
-            return $"卡 {chokeFight.Label} 接团：敌方走卡口且我方人数优势";
-
-        var safestRoute = routes
-            .Where(route => route.Recommendation is "可走" or "可控卡点")
-            .OrderBy(route => route.TotalRisk)
-            .ThenBy(route => route.MountedEtaSeconds)
-            .FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(safestRoute.RouteId))
-            return $"优先路径 {safestRoute.RouteId}：风险 {safestRoute.TotalRisk:0}，骑乘预计 {FormatDuration(safestRoute.MountedEtaSeconds)}";
-
-        var topDanger = zones.FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(topDanger.Id) && topDanger.TotalRisk >= 60f)
-            return $"避开 {topDanger.Label}：风险 {topDanger.TotalRisk:0}";
-
-        var topHeat = heatPoints.OrderByDescending(point => point.Intensity).FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(topHeat.SourceText) && topHeat.Intensity >= 65f)
-            return $"避开实时热区：{topHeat.SourceText}，热度 {topHeat.Intensity:0}";
-
-        return teamSituation.IsEnemySplit ? "敌方分兵，注意夹击入口" : "地图战术风险平稳";
-    }
-
     private void RecordObservedPath(uint territoryType, uint mapId, BattlefieldTacticalSide side, Vector3? center, long now)
     {
         if (!center.HasValue)
@@ -926,6 +893,8 @@ public sealed class MapTacticalAnalysisService
         int staticDangerCount,
         int dynamicDangerCount,
         int mandatoryChokeCount,
+        int highGroundCount,
+        int oneWayPassageCount,
         string recommendation)
     {
         if (totalPointCount == 0)
@@ -936,7 +905,7 @@ public sealed class MapTacticalAnalysisService
             return "地图战术层已接入，但当前地图还没有内置图谱或手动标注";
         }
 
-        return $"地图战术层：内置 {builtInPointCount}，手动 {manualAnnotationCount}，合计 {totalPointCount}，战术区 {zoneCount}，实时热区 {heatPointCount}，静态危险 {staticDangerCount}，动态危险 {dynamicDangerCount}，必卡点 {mandatoryChokeCount}；{recommendation}";
+        return $"地图战术层：内置 {builtInPointCount}，手动 {manualAnnotationCount}，合计 {totalPointCount}，战术区 {zoneCount}，实时热区 {heatPointCount}，静态危险 {staticDangerCount}，动态危险 {dynamicDangerCount}，必卡点 {mandatoryChokeCount}，高台 {highGroundCount}，单向通道 {oneWayPassageCount}；{recommendation}";
     }
 
     private static float Distance2D(Vector3 a, Vector3 b)

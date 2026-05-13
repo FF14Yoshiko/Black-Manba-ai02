@@ -2010,6 +2010,8 @@ public sealed class WorldStateService : IDisposable
                     pending.MapVisionClusters,
                     pending.MapObjectives,
                     pending.TeamSituation,
+                    pending.TimeSituation,
+                    pending.AnnouncementSituation,
                     pending.ChatEventSituation,
                     completedAt);
                 pending.TeamSituation.AdvancedTactics = BuildAdvancedTacticalSituation(

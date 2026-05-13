@@ -98,7 +98,7 @@ public partial class MainWindow
                         commandOverlay.Height = 150f;
                         commandOverlay.FontScale = 2.0f;
                         commandOverlay.PublishedHoldSeconds = 5;
-                        commandOverlay.AiLeadHoldSeconds = 6;
+                        commandOverlay.AiLeadHoldSeconds = 5;
                         commandOverlay.AiTextColorR = 0.35f;
                         commandOverlay.AiTextColorG = 0.82f;
                         commandOverlay.AiTextColorB = 1f;

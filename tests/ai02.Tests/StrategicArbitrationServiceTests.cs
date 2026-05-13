@@ -116,6 +116,142 @@ public sealed class StrategicArbitrationServiceTests
     }
 
     [Fact]
+    public void Apply_UsesStructuredActionTypeWhenDirectiveTextIsNotParsable()
+    {
+        var service = new StrategicArbitrationService();
+        var localEngageCommand = BattlefieldTestFactory.Command(
+            "local:engage",
+            BattlefieldCommandKind.Engage,
+            "主团接团 Enemy1",
+            new Vector3(40f, 0f, 0f),
+            "Enemy1",
+            score: 84f,
+            urgency: 80f);
+        var localEngageAction = BattlefieldTestFactory.Action(
+            "local:action:engage",
+            localEngageCommand.Id,
+            BattlefieldActionType.Engage,
+            BattlefieldCommandKind.Engage,
+            "主团接团 Enemy1",
+            new Vector3(40f, 0f, 0f),
+            "alliance:2",
+            "Enemy1",
+            priority: 84f,
+            confidence: 78f,
+            urgency: 80f);
+        var safeObjective = BattlefieldTestFactory.ObjectivePriority(
+            "safe",
+            "Safe Node",
+            BattlefieldMapObjectiveCategory.Tomelith,
+            BattlefieldMapObjectiveState.Active,
+            new Vector3(90f, 0f, 70f),
+            114f,
+            12,
+            24f,
+            76f,
+            recommendedAction: "转点 Safe Node");
+        var rotateCommand = BattlefieldTestFactory.Command(
+            "local:rotate:safe",
+            BattlefieldCommandKind.Rotate,
+            "主团转点 Safe Node",
+            safeObjective.Position,
+            safeObjective.Name,
+            score: 74f,
+            urgency: 72f);
+        var rotateAction = BattlefieldTestFactory.Action(
+            "local:action:rotate:safe",
+            rotateCommand.Id,
+            BattlefieldActionType.Rotate,
+            BattlefieldCommandKind.Rotate,
+            "主团转点 Safe Node",
+            safeObjective.Position,
+            safeObjective.ObjectiveId,
+            safeObjective.Name,
+            priority: 74f,
+            confidence: 72f,
+            urgency: 72f,
+            etaSeconds: safeObjective.MountedEtaSeconds);
+
+        var localDecision = CreateDecision(
+            new BattlefieldRiskAssessmentSnapshot { OverallRisk = 42f, CombatRisk = 38f },
+            localEngageCommand,
+            localEngageAction,
+            canPublish: true,
+            commands: [localEngageCommand, rotateCommand],
+            actions: [localEngageAction, rotateAction],
+            objectivePriorities: [safeObjective],
+            primaryObjective: safeObjective,
+            objectiveTarget: BattlefieldTestFactory.PriorityTarget("Local", safeObjective.Name, rotateAction.Text, safeObjective.Position));
+        var snapshot = CreateSnapshot(localDecision);
+        var llmDecision = new BattlefieldLlmStrategicDecisionSnapshot
+        {
+            IsAvailable = true,
+            IsFresh = true,
+            ActionType = "rotate",
+            RecommendedAction = "优先去 Safe Node",
+            PriorityTarget = "Safe Node",
+            Confidence = 88f,
+            Risk = 22f,
+            ReceivedAtTicks = 12346
+        };
+
+        var result = service.Apply(snapshot, localDecision, llmDecision);
+
+        Assert.NotSame(localDecision, result);
+        Assert.True(result.PrimaryAction.HasValue);
+        Assert.Equal(BattlefieldActionType.Rotate, result.PrimaryAction.Value.ActionType);
+        Assert.Equal("Safe Node", result.PrimaryAction.Value.TargetName);
+    }
+
+    [Fact]
+    public void Apply_KeepsLocalDecisionWhenStructuredActionTypeIsUnknown()
+    {
+        var service = new StrategicArbitrationService();
+        var localEngageCommand = BattlefieldTestFactory.Command(
+            "local:engage",
+            BattlefieldCommandKind.Engage,
+            "主团接团 Enemy1",
+            new Vector3(40f, 0f, 0f),
+            "Enemy1",
+            score: 84f,
+            urgency: 80f);
+        var localEngageAction = BattlefieldTestFactory.Action(
+            "local:action:engage",
+            localEngageCommand.Id,
+            BattlefieldActionType.Engage,
+            BattlefieldCommandKind.Engage,
+            "主团接团 Enemy1",
+            new Vector3(40f, 0f, 0f),
+            "alliance:2",
+            "Enemy1",
+            priority: 84f,
+            confidence: 78f,
+            urgency: 80f);
+        var localDecision = CreateDecision(
+            new BattlefieldRiskAssessmentSnapshot { OverallRisk = 42f, CombatRisk = 38f },
+            localEngageCommand,
+            localEngageAction,
+            canPublish: true,
+            fightTarget: BattlefieldTestFactory.PriorityTarget("Local", "Enemy1", localEngageAction.Text, localEngageAction.Destination));
+        var snapshot = CreateSnapshot(localDecision);
+        var llmDecision = new BattlefieldLlmStrategicDecisionSnapshot
+        {
+            IsAvailable = true,
+            IsFresh = true,
+            ActionType = "teleport_everyone",
+            RecommendedAction = "去一个更好的地方",
+            PriorityTarget = "Enemy1",
+            Confidence = 88f,
+            Risk = 22f,
+            ReceivedAtTicks = 12347
+        };
+
+        var result = service.Apply(snapshot, localDecision, llmDecision);
+
+        Assert.Same(localDecision, result);
+    }
+
+    [Fact]
     public void Apply_KeepsLocalEmergencyRetreatAgainstNonEmergencyAiDirective()
     {
         var service = new StrategicArbitrationService();

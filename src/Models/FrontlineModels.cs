@@ -1103,11 +1103,24 @@ public sealed class BattlefieldMapTacticsSnapshot
     public int StaticDangerCount { get; init; }
     public int DynamicDangerCount { get; init; }
     public int MandatoryChokeCount { get; init; }
+    public int HighGroundCount { get; init; }
+    public int LowGroundCount { get; init; }
+    public int JumpPadCount { get; init; }
+    public int TeleporterCount { get; init; }
+    public int FlankEntryCount { get; init; }
+    public int BridgeCount { get; init; }
+    public int UnderpassCount { get; init; }
+    public int OneWayPassageCount { get; init; }
     public BattlefieldMapTacticalZoneSnapshot[] TopZones { get; init; } = Array.Empty<BattlefieldMapTacticalZoneSnapshot>();
     public BattlefieldMapTacticalRouteSnapshot[] Routes { get; init; } = Array.Empty<BattlefieldMapTacticalRouteSnapshot>();
     public BattlefieldMapHeatPointSnapshot[] HeatPoints { get; init; } = Array.Empty<BattlefieldMapHeatPointSnapshot>();
     public BattlefieldMapGroupPathSnapshot FriendlyObservedPath { get; init; }
     public BattlefieldMapGroupPathSnapshot EnemyObservedPath { get; init; }
+    public string DangerSummaryText { get; init; } = string.Empty;
+    public string TerrainAdvantageSummaryText { get; init; } = string.Empty;
+    public string PassabilitySummaryText { get; init; } = string.Empty;
+    public string RewardModelSummaryText { get; init; } = string.Empty;
+    public string MapKnowledgeFocusText { get; init; } = string.Empty;
     public string CurrentRecommendation { get; init; } = string.Empty;
     public string SummaryText { get; init; } = "地图战术层尚未形成";
 }
@@ -1523,6 +1536,7 @@ public sealed class BattlefieldLlmStrategicDecisionSnapshot
     public string SessionId { get; init; } = string.Empty;
     public string Decision { get; init; } = string.Empty;
     public string ShortReason { get; init; } = string.Empty;
+    public string ActionType { get; init; } = string.Empty;
     public string RecommendedAction { get; init; } = string.Empty;
     public string PriorityTarget { get; init; } = string.Empty;
     public float Confidence { get; init; }
@@ -1555,10 +1569,12 @@ public sealed class BattlefieldLlmDebugSnapshot
     public bool IsConfigured { get; init; }
     public bool IsPending { get; init; }
     public bool HasRequest { get; init; }
+    public bool IsRoutinePulseEnabled { get; init; }
     public string StatusText { get; init; } = string.Empty;
     public string SessionId { get; init; } = string.Empty;
     public string CurrentNeedText { get; init; } = string.Empty;
     public string CurrentGateReason { get; init; } = string.Empty;
+    public string CurrentRequestSourceText { get; init; } = string.Empty;
     public string LastRequestNeedText { get; init; } = string.Empty;
     public string LastRequestGateReason { get; init; } = string.Empty;
     public string LastRequestSituationKey { get; init; } = string.Empty;
@@ -1572,6 +1588,9 @@ public sealed class BattlefieldLlmDebugSnapshot
     public string DebugPositionRead { get; init; } = string.Empty;
     public string DebugLatencyNote { get; init; } = string.Empty;
     public string ErrorText { get; init; } = string.Empty;
+    public long LastRoutinePulseRequestedAtUnixMs { get; init; } = -1;
+    public int LastRoutinePulseAgeSeconds { get; init; } = -1;
+    public int RoutinePulseRemainingSeconds { get; init; } = -1;
     public long RequestedAtTicks { get; init; } = -1;
     public long ReceivedAtTicks { get; init; } = -1;
     public int AgeSeconds { get; init; } = -1;

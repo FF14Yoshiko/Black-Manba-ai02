@@ -6,6 +6,7 @@ namespace ai02;
 public readonly record struct LlmDecisionResponseParseResult(
     string Decision,
     string ShortReason,
+    string ActionType,
     string RecommendedAction,
     string PriorityTarget,
     float Confidence,
@@ -27,6 +28,7 @@ public static class LlmDecisionResponseParser
     {
         var decisionText = GetString(root, "decision", "决策", "decision_body");
         var shortReason = GetString(root, "short_reason", "shortReason", "reason", "简短理由");
+        var actionType = GetString(root, "action_type", "actionType", "行动类型");
         var recommendedAction = GetString(root, "recommended_action", "recommendedAction", "action", "建议行动");
         var priorityTarget = GetString(root, "priority_target", "priorityTarget", "target", "优先目标");
         var confidence = GetFloat(root, 72f, "confidence", "置信度");
@@ -44,6 +46,7 @@ public static class LlmDecisionResponseParser
         return new LlmDecisionResponseParseResult(
             decisionText,
             shortReason,
+            actionType,
             recommendedAction,
             priorityTarget,
             Math.Clamp(confidence, 0f, 100f),

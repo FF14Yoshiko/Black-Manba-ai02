@@ -20,6 +20,22 @@ public sealed class LlmGateSchedulingPolicyTests
     }
 
     [Fact]
+    public void ApplyRoutinePulseGate_BlocksRoutineGate_WhenRoutinePulseIsDisabled()
+    {
+        var result = LlmGateSchedulingPolicy.ApplyRoutinePulseGate(
+            BattlefieldLlmDecisionNeedKind.RoutineStrategicPulse,
+            routinePulseEnabled: false,
+            routinePulseIntervalSeconds: 25,
+            lastRequestTicks: 100_000,
+            nowTicks: 112_400);
+
+        Assert.False(result.ShouldRequest);
+        Assert.Equal(0, result.RemainingSeconds);
+        Assert.Contains("已关闭", result.WaitReason);
+        Assert.Contains("仅事件触发", result.WaitReason);
+    }
+
+    [Fact]
     public void ApplyRoutinePulseGate_AllowsEventGate_WithSameLastRequestTicks()
     {
         var result = LlmGateSchedulingPolicy.ApplyRoutinePulseGate(

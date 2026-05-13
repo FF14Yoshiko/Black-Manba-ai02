@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Numerics;
 
 namespace ai02.Tests;
@@ -181,9 +182,21 @@ internal static class BattlefieldTestFactory
             BuiltInGraphPointCount = 0,
             ManualAnnotationCount = zones.Length,
             ZoneCount = zones.Length,
+            HighGroundCount = zones.Count(zone => zone.Kind == MapAnnotationKind.HighGround),
+            LowGroundCount = zones.Count(zone => zone.Kind == MapAnnotationKind.LowGround),
+            JumpPadCount = zones.Count(zone => zone.Kind == MapAnnotationKind.JumpPad),
+            TeleporterCount = zones.Count(zone => zone.Kind == MapAnnotationKind.Teleporter),
+            FlankEntryCount = zones.Count(zone => zone.Kind == MapAnnotationKind.Flank),
+            BridgeCount = zones.Count(zone => zone.Kind == MapAnnotationKind.Bridge),
+            UnderpassCount = zones.Count(zone => zone.Kind == MapAnnotationKind.Underpass),
             TopZones = zones,
             Routes = Array.Empty<BattlefieldMapTacticalRouteSnapshot>(),
             HeatPoints = Array.Empty<BattlefieldMapHeatPointSnapshot>(),
+            DangerSummaryText = "test",
+            TerrainAdvantageSummaryText = "test",
+            PassabilitySummaryText = "test",
+            RewardModelSummaryText = "test",
+            MapKnowledgeFocusText = "test",
             CurrentRecommendation = "test"
         };
 

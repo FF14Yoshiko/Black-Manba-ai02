@@ -58,7 +58,7 @@ public sealed class CommandOverlayAiDisplayPolicyTests
         var first = CommandOverlayAiDisplayPolicy.ResolveDisplay(
             aiDisplay,
             1000,
-            6,
+            5,
             ref heldAi,
             ref heldAiTicks);
 
@@ -72,8 +72,8 @@ public sealed class CommandOverlayAiDisplayPolicyTests
 
         var sticky = CommandOverlayAiDisplayPolicy.ResolveDisplay(
             localDisplay,
-            6500,
-            6,
+            6000,
+            5,
             ref heldAi,
             ref heldAiTicks);
 
@@ -97,8 +97,8 @@ public sealed class CommandOverlayAiDisplayPolicyTests
 
         var resolved = CommandOverlayAiDisplayPolicy.ResolveDisplay(
             localDisplay,
-            7201,
-            6,
+            6001,
+            5,
             ref heldAi,
             ref heldAiTicks);
 

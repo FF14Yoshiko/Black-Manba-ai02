@@ -2,6 +2,13 @@
 
 All notable changes to this plugin will be documented in this file.
 
+## 1.2.2 - 2026-05-14
+
+- Fixed the 25-second in-match LLM routine pulse so high-pressure local combat states no longer suppress fixed strategic sampling.
+- Added clearer AI debug timing and request-source visibility, including last routine pulse time and countdown to the next fixed pulse.
+- Hardened LLM arbitration and service coverage with structured action type handling, safer local fallback behavior, and broader service-level tests.
+- Expanded map semantics toward danger zones, choke points, high ground, passability, and reward windows so tactical reads rely more on explicit point knowledge.
+
 ## 1.2.1 - 2026-05-13
 
 - Refactored the oversized MainWindow into clearer partial modules while preserving the existing toolchain, review surfaces, and in-match controls.

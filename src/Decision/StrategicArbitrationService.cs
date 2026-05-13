@@ -81,6 +81,9 @@ public sealed class StrategicArbitrationService
         if (llmDecision.Confidence < MinConfidenceToLead)
             return false;
 
+        if (!string.IsNullOrWhiteSpace(llmDecision.ActionType))
+            return true;
+
         return !string.IsNullOrWhiteSpace(llmDecision.RecommendedAction)
             || !string.IsNullOrWhiteSpace(llmDecision.Decision);
     }
@@ -112,16 +115,18 @@ public sealed class StrategicArbitrationService
         BattlefieldLlmStrategicDecisionSnapshot llmDecision)
     {
         var rawText = ResolveDirectiveSourceText(llmDecision);
-        if (string.IsNullOrWhiteSpace(rawText))
+        if (!TryResolveActionType(llmDecision, rawText, out var actionType))
             return default;
 
         var normalized = Normalize(rawText);
-        var actionType = ResolveActionType(normalized);
         var commandKind = ResolveCommandKind(actionType);
         var target = ResolveTarget(snapshot, localDecision, llmDecision, normalized, actionType);
+        var directiveText = string.IsNullOrWhiteSpace(rawText)
+            ? BuildFallbackDirectiveText(actionType, target.Name, target.EtaSeconds, target.CountdownSeconds)
+            : rawText;
         return new StrategicDirective(
             true,
-            rawText,
+            directiveText,
             BuildFallbackDirectiveText(actionType, target.Name, target.EtaSeconds, target.CountdownSeconds),
             actionType,
             commandKind,
@@ -135,46 +140,160 @@ public sealed class StrategicArbitrationService
             return llmDecision.RecommendedAction.Trim();
         if (!string.IsNullOrWhiteSpace(llmDecision.Decision))
             return llmDecision.Decision.Trim();
+        if (!string.IsNullOrWhiteSpace(llmDecision.ActionType))
+            return llmDecision.ActionType.Trim();
         return string.Empty;
     }
 
-    private static BattlefieldActionType ResolveActionType(string normalized)
+    private static bool TryResolveActionType(
+        BattlefieldLlmStrategicDecisionSnapshot llmDecision,
+        string rawText,
+        out BattlefieldActionType actionType)
     {
+        if (!string.IsNullOrWhiteSpace(llmDecision.ActionType))
+            return TryResolveStructuredActionType(llmDecision.ActionType, out actionType);
+
+        return TryResolveActionTypeFromText(rawText, out actionType);
+    }
+
+    private static bool TryResolveStructuredActionType(string actionTypeText, out BattlefieldActionType actionType)
+    {
+        var normalized = Normalize(actionTypeText);
+        actionType = normalized switch
+        {
+            "rotate" => BattlefieldActionType.Rotate,
+            "defendobjective" => BattlefieldActionType.DefendObjective,
+            "contestobjective" => BattlefieldActionType.ContestObjective,
+            "abandonobjective" => BattlefieldActionType.AbandonObjective,
+            "attackice" => BattlefieldActionType.AttackIce,
+            "touchobjective" => BattlefieldActionType.TouchObjective,
+            "interrupttouch" => BattlefieldActionType.InterruptTouch,
+            "engage" => BattlefieldActionType.Engage,
+            "retreat" => BattlefieldActionType.Retreat,
+            "returntobase" => BattlefieldActionType.ReturnToBase,
+            "flank" => BattlefieldActionType.Flank,
+            "wrapbehind" => BattlefieldActionType.WrapBehind,
+            "backlinepressure" => BattlefieldActionType.BacklinePressure,
+            "focustarget" => BattlefieldActionType.FocusTarget,
+            "protecthighbattlehigh" => BattlefieldActionType.ProtectHighBattleHigh,
+            "regroup" => BattlefieldActionType.Regroup,
+            "spread" => BattlefieldActionType.Spread,
+            "detour" => BattlefieldActionType.Detour,
+            "hold" => BattlefieldActionType.Hold,
+            "wait" => BattlefieldActionType.Wait,
+            _ => BattlefieldActionType.Unknown
+        };
+
+        return actionType != BattlefieldActionType.Unknown;
+    }
+
+    private static bool TryResolveActionTypeFromText(string rawText, out BattlefieldActionType actionType)
+    {
+        var normalized = Normalize(rawText);
         if (ContainsAny(normalized, "回家", "回补", "回基地", "回出生"))
-            return BattlefieldActionType.ReturnToBase;
+        {
+            actionType = BattlefieldActionType.ReturnToBase;
+            return true;
+        }
+
         if (ContainsAny(normalized, "撤退", "回撤", "后撤", "脱离", "撤出", "拉开"))
-            return BattlefieldActionType.Retreat;
+        {
+            actionType = BattlefieldActionType.Retreat;
+            return true;
+        }
+
         if (ContainsAny(normalized, "断摸点", "打断摸点", "打断占点", "断点"))
-            return BattlefieldActionType.InterruptTouch;
+        {
+            actionType = BattlefieldActionType.InterruptTouch;
+            return true;
+        }
+
         if (ContainsAny(normalized, "抢点", "抢占", "争夺"))
-            return BattlefieldActionType.ContestObjective;
+        {
+            actionType = BattlefieldActionType.ContestObjective;
+            return true;
+        }
+
         if (ContainsAny(normalized, "摸点", "占点", "踩点"))
-            return BattlefieldActionType.TouchObjective;
+        {
+            actionType = BattlefieldActionType.TouchObjective;
+            return true;
+        }
+
         if (ContainsAny(normalized, "守点", "控点", "防守"))
-            return BattlefieldActionType.DefendObjective;
+        {
+            actionType = BattlefieldActionType.DefendObjective;
+            return true;
+        }
+
         if (ContainsAny(normalized, "放弃", "不硬抢", "别去", "弃点"))
-            return BattlefieldActionType.AbandonObjective;
+        {
+            actionType = BattlefieldActionType.AbandonObjective;
+            return true;
+        }
+
         if (ContainsAny(normalized, "转点", "轮转", "转去", "换点"))
-            return BattlefieldActionType.Rotate;
+        {
+            actionType = BattlefieldActionType.Rotate;
+            return true;
+        }
+
         if (ContainsAny(normalized, "绕后", "后包", "包后"))
-            return BattlefieldActionType.WrapBehind;
+        {
+            actionType = BattlefieldActionType.WrapBehind;
+            return true;
+        }
+
         if (ContainsAny(normalized, "夹击", "包夹", "侧夹"))
-            return BattlefieldActionType.Flank;
+        {
+            actionType = BattlefieldActionType.Flank;
+            return true;
+        }
+
         if (ContainsAny(normalized, "压后排", "切后排", "侧压", "压后"))
-            return BattlefieldActionType.BacklinePressure;
-        if (ContainsAny(normalized, "打第一", "压第一", "打高分", "打领头", "打高战意", "集火", "收割"))
-            return BattlefieldActionType.FocusTarget;
+        {
+            actionType = BattlefieldActionType.BacklinePressure;
+            return true;
+        }
+
+        if (ContainsAny(normalized, "打第一", "压第一", "打第二", "压第二", "打高分", "打领头", "打高战意", "集火", "收割"))
+        {
+            actionType = BattlefieldActionType.FocusTarget;
+            return true;
+        }
+
         if (ContainsAny(normalized, "接团", "参战", "开团", "打团", "碰团"))
-            return BattlefieldActionType.Engage;
+        {
+            actionType = BattlefieldActionType.Engage;
+            return true;
+        }
+
         if (ContainsAny(normalized, "散开", "分散", "展开"))
-            return BattlefieldActionType.Spread;
+        {
+            actionType = BattlefieldActionType.Spread;
+            return true;
+        }
+
         if (ContainsAny(normalized, "靠拢", "收缩", "集结"))
-            return BattlefieldActionType.Regroup;
+        {
+            actionType = BattlefieldActionType.Regroup;
+            return true;
+        }
+
         if (ContainsAny(normalized, "卡口", "卡住", "hold"))
-            return BattlefieldActionType.Hold;
+        {
+            actionType = BattlefieldActionType.Hold;
+            return true;
+        }
+
         if (ContainsAny(normalized, "等", "等待", "观望"))
-            return BattlefieldActionType.Wait;
-        return BattlefieldActionType.Engage;
+        {
+            actionType = BattlefieldActionType.Wait;
+            return true;
+        }
+
+        actionType = BattlefieldActionType.Unknown;
+        return false;
     }
 
     private static BattlefieldCommandKind ResolveCommandKind(BattlefieldActionType actionType)

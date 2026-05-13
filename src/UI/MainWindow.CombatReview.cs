@@ -424,7 +424,18 @@ public partial class MainWindow
             return;
 
         ImGui.Text($"底图采样：内置 {tactics.BuiltInGraphPointCount}  手动 {tactics.ManualAnnotationCount}  合计 {tactics.AnnotationCount}  实时热区 {tactics.HeatPoints.Length}");
-        ImGui.Text($"高低差/危险：静态 {tactics.StaticDangerCount}  动态/热区 {tactics.DynamicDangerCount}  必卡点 {tactics.MandatoryChokeCount}");
+        ImGui.Text($"危险/通行：静态 {tactics.StaticDangerCount}  动态/热区 {tactics.DynamicDangerCount}  必卡点 {tactics.MandatoryChokeCount}  单向 {tactics.OneWayPassageCount}");
+        ImGui.Text($"地形语义：高台 {tactics.HighGroundCount}  低地 {tactics.LowGroundCount}  跳台 {tactics.JumpPadCount}  传送 {tactics.TeleporterCount}  侧翼入口 {tactics.FlankEntryCount}");
+        if (!string.IsNullOrWhiteSpace(tactics.DangerSummaryText))
+            DrawHint(tactics.DangerSummaryText);
+        if (!string.IsNullOrWhiteSpace(tactics.TerrainAdvantageSummaryText))
+            DrawHint(tactics.TerrainAdvantageSummaryText);
+        if (!string.IsNullOrWhiteSpace(tactics.PassabilitySummaryText))
+            DrawHint(tactics.PassabilitySummaryText);
+        if (!string.IsNullOrWhiteSpace(tactics.RewardModelSummaryText))
+            DrawHint(tactics.RewardModelSummaryText);
+        if (!string.IsNullOrWhiteSpace(tactics.MapKnowledgeFocusText))
+            DrawHint(tactics.MapKnowledgeFocusText);
         if (!string.IsNullOrWhiteSpace(tactics.FriendlyObservedPath.SummaryText))
             DrawHint(tactics.FriendlyObservedPath.SummaryText);
         if (!string.IsNullOrWhiteSpace(tactics.EnemyObservedPath.SummaryText))
@@ -450,11 +461,11 @@ public partial class MainWindow
                 DrawHint(zone.EvidenceText);
         }
 
-        var routeCount = Math.Min(tactics.Routes.Length, 4);
+        var routeCount = Math.Min(tactics.Routes.Length, 2);
         for (var i = 0; i < routeCount; i++)
         {
             var route = tactics.Routes[i];
-            var routeLabel = route.KindSummary == "动态寻路" ? "动态路径" : "图谱路径";
+            var routeLabel = route.KindSummary == "动态寻路" ? "内部通行样本" : "图谱通行样本";
             ImGui.Text($"{routeLabel} {route.RouteId}: {route.Recommendation} 风险:{route.TotalRisk:0} 距离:{route.Distance:0}y 骑:{FormatDuration(route.MountedEtaSeconds)}");
             if (i < 2)
                 DrawHint(route.EvidenceText);
@@ -707,6 +718,9 @@ public partial class MainWindow
     private static void DrawLlmDebugSnapshot(BattlefieldLlmStrategicDecisionSnapshot llm, BattlefieldLlmDebugSnapshot debug)
     {
         ImGui.TextColored(LlmDecisionColor(llm), debug.StatusText);
+        ImGui.Text($"\u672c\u6b21\u8bf7\u6c42\u6765\u6e90\uff1a{FormatLlmRequestSource(debug)}");
+        ImGui.Text($"\u4e0a\u6b21\u56fa\u5b9a\u5206\u6790\u89e6\u53d1\u65f6\u95f4\uff1a{FormatRoutinePulseTriggerTime(debug)}");
+        ImGui.Text($"\u8ddd\u79bb\u4e0b\u6b21\u56fa\u5b9a\u5206\u6790\u8fd8\u6709\uff1a{FormatRoutinePulseRemaining(debug)}");
         ImGui.Text($"当前会话：{(string.IsNullOrWhiteSpace(debug.SessionId) ? "未建立" : debug.SessionId)}");
         ImGui.Text($"请求状态：{BuildLlmDebugStatusText(debug)}");
         if (!string.IsNullOrWhiteSpace(debug.CurrentGateReason))
@@ -754,6 +768,32 @@ public partial class MainWindow
             DrawReadonlyTextPanel("延迟说明", debug.DebugLatencyNote, "LlmDebugLatencyNote", 64f);
             ImGui.TreePop();
         }
+    }
+
+    private static string FormatLlmRequestSource(BattlefieldLlmDebugSnapshot debug)
+        => string.IsNullOrWhiteSpace(debug.CurrentRequestSourceText)
+            ? "\u672c\u5c40\u5c1a\u672a\u53d1\u8d77 AI \u8bf7\u6c42"
+            : debug.CurrentRequestSourceText;
+
+    private static string FormatRoutinePulseTriggerTime(BattlefieldLlmDebugSnapshot debug)
+    {
+        if (debug.LastRoutinePulseRequestedAtUnixMs < 0)
+            return "\u672c\u5c40\u5c1a\u672a\u89e6\u53d1";
+
+        var localTime = DateTimeOffset.FromUnixTimeMilliseconds(debug.LastRoutinePulseRequestedAtUnixMs).ToLocalTime();
+        return debug.LastRoutinePulseAgeSeconds >= 0
+            ? $"{localTime:HH:mm:ss}\uff08{debug.LastRoutinePulseAgeSeconds} \u79d2\u524d\uff09"
+            : $"{localTime:HH:mm:ss}";
+    }
+
+    private static string FormatRoutinePulseRemaining(BattlefieldLlmDebugSnapshot debug)
+    {
+        if (!debug.IsRoutinePulseEnabled)
+            return "\u4ec5\u4e8b\u4ef6\u89e6\u53d1\uff08\u56fa\u5b9a\u5206\u6790\u5df2\u5173\u95ed\uff09";
+
+        return debug.RoutinePulseRemainingSeconds <= 0
+            ? "0 \u79d2\uff08\u5df2\u5230\u70b9\uff09"
+            : $"{debug.RoutinePulseRemainingSeconds} \u79d2";
     }
 
     private static void DrawDualPriorityTargets(BattlefieldDecisionSnapshot decision)

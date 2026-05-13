@@ -47,7 +47,29 @@ public sealed class LlmRoutinePulsePolicyTests
     }
 
     [Fact]
-    public void Evaluate_DisabledPolicyDoesNotThrottle()
+    public void Evaluate_TriggersExactlyAtTwentyFiveSecondsBoundary()
+    {
+        var beforeBoundary = LlmRoutinePulsePolicy.Evaluate(
+            BattlefieldLlmDecisionNeedKind.RoutineStrategicPulse,
+            enabled: true,
+            intervalSeconds: 25,
+            lastRequestTicks: 100_000,
+            nowTicks: 124_999);
+        var atBoundary = LlmRoutinePulsePolicy.Evaluate(
+            BattlefieldLlmDecisionNeedKind.RoutineStrategicPulse,
+            enabled: true,
+            intervalSeconds: 25,
+            lastRequestTicks: 100_000,
+            nowTicks: 125_000);
+
+        Assert.False(beforeBoundary.IsDue);
+        Assert.Equal(1, beforeBoundary.RemainingSeconds);
+        Assert.True(atBoundary.IsDue);
+        Assert.Equal(0, atBoundary.RemainingSeconds);
+    }
+
+    [Fact]
+    public void Evaluate_DisabledPolicyBlocksRoutinePulse()
     {
         var result = LlmRoutinePulsePolicy.Evaluate(
             BattlefieldLlmDecisionNeedKind.RoutineStrategicPulse,
@@ -56,8 +78,9 @@ public sealed class LlmRoutinePulsePolicyTests
             lastRequestTicks: 100_000,
             nowTicks: 101_000);
 
-        Assert.True(result.IsDue);
+        Assert.False(result.IsDue);
         Assert.Equal(0, result.RemainingSeconds);
+        Assert.True(result.IsDisabled);
     }
 
     [Fact]
@@ -72,6 +95,7 @@ public sealed class LlmRoutinePulsePolicyTests
 
         Assert.True(result.IsDue);
         Assert.Equal(0, result.RemainingSeconds);
+        Assert.False(result.IsDisabled);
     }
 
     [Fact]

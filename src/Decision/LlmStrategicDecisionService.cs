@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -42,7 +42,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
 
     private readonly Configuration configuration;
     private readonly IPluginLog log;
-    private readonly HttpClient httpClient = new();
+    private readonly HttpClient httpClient;
     private readonly object sync = new();
     private readonly Queue<LlmConversationTurn> conversation = new();
     private CancellationTokenSource? requestCancellation;
@@ -55,6 +55,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
     private int lastMatchTimeRemaining = -1;
     private long lastRequestTicks = -1;
     private long lastRoutinePulseTicks = -1;
+    private long lastRoutinePulseRequestedAtUnixMs = -1;
     private string lastRequestSituationKey = string.Empty;
     private string lastErrorText = string.Empty;
     private LlmGateResult lastRequestGate = LlmGateResult.None("尚未发起 AI 请求");
@@ -67,10 +68,16 @@ public sealed class LlmStrategicDecisionService : IDisposable
     private bool disposed;
 
     public LlmStrategicDecisionService(Configuration configuration, IPluginLog log)
+        : this(configuration, log, null)
+    {
+    }
+
+    internal LlmStrategicDecisionService(Configuration configuration, IPluginLog log, HttpClient? httpClient)
     {
         this.configuration = configuration;
         this.log = log;
-        httpClient.Timeout = Timeout.InfiniteTimeSpan;
+        this.httpClient = httpClient ?? new HttpClient();
+        this.httpClient.Timeout = Timeout.InfiniteTimeSpan;
     }
 
     public BattlefieldLlmStrategicDecisionSnapshot EvaluateAndMaybeRequest(BattlefieldSnapshot snapshot)
@@ -139,6 +146,8 @@ public sealed class LlmStrategicDecisionService : IDisposable
         string rawResponse;
         string parsedJson;
         long responseTicks;
+        long routinePulseTicks;
+        long routinePulseRequestedAtUnixMs;
         LlmConversationTurn[] turns;
         lock (sync)
         {
@@ -149,6 +158,8 @@ public sealed class LlmStrategicDecisionService : IDisposable
             rawResponse = lastRawResponse;
             parsedJson = lastParsedJson;
             responseTicks = lastResponseTicks;
+            routinePulseTicks = lastRoutinePulseTicks;
+            routinePulseRequestedAtUnixMs = lastRoutinePulseRequestedAtUnixMs;
             turns = conversation.ToArray();
         }
 
@@ -159,6 +170,15 @@ public sealed class LlmStrategicDecisionService : IDisposable
         var ageSeconds = responseTicks >= 0
             ? Math.Max(0, (int)((now - responseTicks) / 1000L))
             : runtime.AgeSeconds;
+        var routinePulseEvaluation = LlmRoutinePulsePolicy.Evaluate(
+            BattlefieldLlmDecisionNeedKind.RoutineStrategicPulse,
+            config.RoutinePulseEnabled,
+            config.RoutinePulseIntervalSeconds,
+            routinePulseTicks,
+            now);
+        var lastRoutinePulseAgeSeconds = routinePulseTicks >= 0
+            ? Math.Max(0, (int)((now - routinePulseTicks) / 1000L))
+            : -1;
 
         return new BattlefieldLlmDebugSnapshot
         {
@@ -166,10 +186,12 @@ public sealed class LlmStrategicDecisionService : IDisposable
             IsConfigured = runtime.IsConfigured,
             IsPending = runtime.IsPending,
             HasRequest = hasRequest,
+            IsRoutinePulseEnabled = config.RoutinePulseEnabled,
             StatusText = runtime.StatusText,
             SessionId = runtime.SessionId,
             CurrentNeedText = runtime.NeedText,
             CurrentGateReason = runtime.GateReason,
+            CurrentRequestSourceText = hasRequest ? DescribeRequestSource(requestGate.NeedKind) : string.Empty,
             LastRequestNeedText = hasRequest ? NeedKindText(requestGate.NeedKind) : string.Empty,
             LastRequestGateReason = hasRequest ? requestGate.Reason : string.Empty,
             LastRequestSituationKey = hasRequest ? requestGate.SituationKey : string.Empty,
@@ -183,6 +205,9 @@ public sealed class LlmStrategicDecisionService : IDisposable
             DebugPositionRead = runtime.DebugPositionRead,
             DebugLatencyNote = runtime.DebugLatencyNote,
             ErrorText = runtime.ErrorText,
+            LastRoutinePulseRequestedAtUnixMs = routinePulseRequestedAtUnixMs,
+            LastRoutinePulseAgeSeconds = lastRoutinePulseAgeSeconds,
+            RoutinePulseRemainingSeconds = routinePulseEvaluation.IsDisabled ? -1 : routinePulseEvaluation.RemainingSeconds,
             RequestedAtTicks = runtime.RequestedAtTicks,
             ReceivedAtTicks = responseTicks >= 0 ? responseTicks : runtime.ReceivedAtTicks,
             AgeSeconds = ageSeconds,
@@ -279,6 +304,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
                 lastErrorText = string.Empty;
                 lastRequestTicks = -1;
                 lastRoutinePulseTicks = -1;
+                lastRoutinePulseRequestedAtUnixMs = -1;
                 lastRequestSituationKey = string.Empty;
                 ClearDebugArtifacts();
                 requestCancellation?.Cancel();
@@ -304,6 +330,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
             lastErrorText = string.Empty;
             lastRequestTicks = -1;
             lastRoutinePulseTicks = -1;
+            lastRoutinePulseRequestedAtUnixMs = -1;
             lastRequestSituationKey = string.Empty;
             ClearDebugArtifacts();
             requestCancellation?.Cancel();
@@ -400,6 +427,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
             SessionId = sessionId,
             Decision = decision?.Decision ?? string.Empty,
             ShortReason = decision?.ShortReason ?? string.Empty,
+            ActionType = decision?.ActionType ?? string.Empty,
             RecommendedAction = decision?.RecommendedAction ?? string.Empty,
             PriorityTarget = decision?.PriorityTarget ?? string.Empty,
             Confidence = decision?.Confidence ?? 0f,
@@ -434,9 +462,6 @@ public sealed class LlmStrategicDecisionService : IDisposable
             return LlmGateResult.None("缺少对局时间，本地低风险规则兜底");
         if (input.IsAvailable && (input.OverallReliability < reliabilityThreshold || input.PlayerReliability < playerReliabilityThreshold))
             return LlmGateResult.None($"输入可靠度偏低（总体 {input.OverallReliability:0} / 玩家 {input.PlayerReliability:0}），不上传");
-        if (IsImmediateLocalThreat(decision))
-            return LlmGateResult.None("即时战斗威胁由本地状态机处理，不等待 AI");
-
         var localCenter = ResolveLocalCenter(snapshot);
         var enemyCenters = ResolveEnemyAllianceCenters(snapshot).ToArray();
         var primary = decision.PrimaryObjective;
@@ -633,6 +658,15 @@ public sealed class LlmStrategicDecisionService : IDisposable
         lock (sync)
         {
             var isRoutinePulse = gate.NeedKind == BattlefieldLlmDecisionNeedKind.RoutineStrategicPulse;
+            var routinePulseEvaluation = gate.NeedKind == BattlefieldLlmDecisionNeedKind.ManualProbe
+                ? LlmRoutinePulsePolicy.RoutinePulseEvaluation.Disabled
+                : LlmRoutinePulsePolicy.Evaluate(
+                    BattlefieldLlmDecisionNeedKind.RoutineStrategicPulse,
+                    config.RoutinePulseEnabled,
+                    config.RoutinePulseIntervalSeconds,
+                    lastRoutinePulseTicks,
+                    now);
+            var shouldRefreshRoutinePulseTimestamp = isRoutinePulse || routinePulseEvaluation.IsDue;
             if (disposed)
             {
                 failureReason = "插件已释放，请重新打开插件后再试。";
@@ -644,7 +678,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
                 return false;
             }
             var minIntervalMs = ResolveMinIntervalMs(config, gate);
-            if (!ignoreRateLimit && !isRoutinePulse && lastRequestTicks >= 0 && now - lastRequestTicks < minIntervalMs)
+            if (!ignoreRateLimit && !shouldRefreshRoutinePulseTimestamp && lastRequestTicks >= 0 && now - lastRequestTicks < minIntervalMs)
             {
                 var remaining = Math.Max(1, (int)Math.Ceiling((minIntervalMs - (now - lastRequestTicks)) / 1000d));
                 failureReason = $"最小请求间隔还没到，请再等 {remaining} 秒。";
@@ -652,7 +686,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
             }
             var sameSituationCooldownMs = ResolveSameSituationCooldownMs(config, gate);
             if (!ignoreRateLimit
-                && !isRoutinePulse
+                && !shouldRefreshRoutinePulseTimestamp
                 && string.Equals(lastRequestSituationKey, gate.SituationKey, StringComparison.Ordinal)
                 && lastRequestTicks >= 0
                 && now - lastRequestTicks < sameSituationCooldownMs)
@@ -663,8 +697,11 @@ public sealed class LlmStrategicDecisionService : IDisposable
             }
 
             lastRequestTicks = now;
-            if (isRoutinePulse)
+            if (shouldRefreshRoutinePulseTimestamp)
+            {
                 lastRoutinePulseTicks = now;
+                lastRoutinePulseRequestedAtUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            }
             lastRequestSituationKey = gate.SituationKey;
             lastErrorText = string.Empty;
             requestCancellation?.Dispose();
@@ -835,6 +872,7 @@ public sealed class LlmStrategicDecisionService : IDisposable
             SessionId = context.SessionId,
             Decision = Truncate(parsed.Decision, 220),
             ShortReason = Truncate(parsed.ShortReason, 260),
+            ActionType = Truncate(parsed.ActionType, 64),
             RecommendedAction = Truncate(parsed.RecommendedAction, 160),
             PriorityTarget = Truncate(parsed.PriorityTarget, 80),
             Confidence = Math.Clamp(parsed.Confidence, 0f, 100f),
@@ -865,10 +903,11 @@ public sealed class LlmStrategicDecisionService : IDisposable
 {
   "decision": "一句完整大决策",
   "short_reason": "一句简短理由，给调试界面看",
+  "action_type": "只能从 rotate, defend_objective, contest_objective, abandon_objective, attack_ice, touch_objective, interrupt_touch, engage, retreat, return_to_base, flank, wrap_behind, backline_pressure, focus_target, protect_high_battle_high, regroup, spread, detour, hold, wait 中选一个",
   "confidence": 0-100,
   "risk": 0-100,
   "priority_target": "优先目标或阵营",
-  "recommended_action": "由动词+名词拼出的短行动",
+  "recommended_action": "由动词+名词拼出的短行动，且要和 action_type 一致",
   "debug": { "score_read": "...", "position_read": "...", "latency_note": "..." }
 }
 """;
@@ -962,6 +1001,29 @@ public sealed class LlmStrategicDecisionService : IDisposable
             },
             allowed_strategy = new
             {
+                action_types = new[]
+                {
+                    "rotate",
+                    "defend_objective",
+                    "contest_objective",
+                    "abandon_objective",
+                    "attack_ice",
+                    "touch_objective",
+                    "interrupt_touch",
+                    "engage",
+                    "retreat",
+                    "return_to_base",
+                    "flank",
+                    "wrap_behind",
+                    "backline_pressure",
+                    "focus_target",
+                    "protect_high_battle_high",
+                    "regroup",
+                    "spread",
+                    "detour",
+                    "hold",
+                    "wait"
+                },
                 verbs = StrategyVerbs,
                 nouns = StrategyNouns
             },
@@ -1067,6 +1129,21 @@ public sealed class LlmStrategicDecisionService : IDisposable
             {
                 map_recommendation = snapshot.MapTactics.CurrentRecommendation,
                 map_summary = snapshot.MapTactics.SummaryText,
+                map_danger = snapshot.MapTactics.DangerSummaryText,
+                map_terrain = snapshot.MapTactics.TerrainAdvantageSummaryText,
+                map_passability = snapshot.MapTactics.PassabilitySummaryText,
+                map_reward_model = snapshot.MapTactics.RewardModelSummaryText,
+                map_focus = snapshot.MapTactics.MapKnowledgeFocusText,
+                map_features = new
+                {
+                    snapshot.MapTactics.HighGroundCount,
+                    snapshot.MapTactics.LowGroundCount,
+                    snapshot.MapTactics.JumpPadCount,
+                    snapshot.MapTactics.TeleporterCount,
+                    snapshot.MapTactics.FlankEntryCount,
+                    snapshot.MapTactics.MandatoryChokeCount,
+                    snapshot.MapTactics.OneWayPassageCount
+                },
                 advanced_summary = snapshot.TeamSituation.AdvancedTactics.SummaryText,
                 advanced_flags = new
                 {
@@ -1428,6 +1505,15 @@ public sealed class LlmStrategicDecisionService : IDisposable
             BattlefieldLlmDecisionNeedKind.UnstableThreeFaction => "三方站位不稳定",
             BattlefieldLlmDecisionNeedKind.ScoreTargetAmbiguity => "比分目标不明确",
             _ => "无需 AI 大决策"
+        };
+
+    private static string DescribeRequestSource(BattlefieldLlmDecisionNeedKind kind)
+        => kind switch
+        {
+            BattlefieldLlmDecisionNeedKind.None => "\u672c\u5c40\u5c1a\u672a\u53d1\u8d77 AI \u8bf7\u6c42",
+            BattlefieldLlmDecisionNeedKind.ManualProbe => "\u624b\u52a8\u6d4b\u8bd5/\u5bf9\u8bdd",
+            BattlefieldLlmDecisionNeedKind.RoutineStrategicPulse => "\u5e38\u89c4\u6218\u7565\u91c7\u6837",
+            _ => $"\u4e8b\u4ef6\u89e6\u53d1\uff08{NeedKindText(kind)}\uff09"
         };
 
     private static string RelationText(BattlefieldPlayerRelation relation, bool isLocalAlliance)

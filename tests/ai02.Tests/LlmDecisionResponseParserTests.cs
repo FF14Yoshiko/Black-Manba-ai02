@@ -11,6 +11,7 @@ public sealed class LlmDecisionResponseParserTests
         {
           "decision": "转点抢高价值点",
           "shortReason": "敌方主团还没到",
+          "actionType": "rotate",
           "recommendedAction": "转点 高价值点",
           "priorityTarget": "高价值点",
           "confidence": "88",
@@ -27,6 +28,7 @@ public sealed class LlmDecisionResponseParserTests
 
         Assert.Equal("转点抢高价值点", parsed.Decision);
         Assert.Equal("敌方主团还没到", parsed.ShortReason);
+        Assert.Equal("rotate", parsed.ActionType);
         Assert.Equal("转点 高价值点", parsed.RecommendedAction);
         Assert.Equal("高价值点", parsed.PriorityTarget);
         Assert.Equal(88f, parsed.Confidence);
@@ -50,6 +52,7 @@ public sealed class LlmDecisionResponseParserTests
         var parsed = LlmDecisionResponseParser.Parse(json);
 
         Assert.Equal("打第一 敌方第一", parsed.Decision);
+        Assert.Equal(string.Empty, parsed.ActionType);
         Assert.Equal("打第一 敌方第一", parsed.RecommendedAction);
         Assert.Equal(100f, parsed.Confidence);
         Assert.Equal(0f, parsed.Risk);

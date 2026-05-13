@@ -15,6 +15,13 @@ internal static class LlmGateSchedulingPolicy
             routinePulseIntervalSeconds,
             lastRequestTicks,
             nowTicks);
+        if (evaluation.IsDisabled)
+        {
+            return GateSchedulingDecision.Waiting(
+                "固定局内 AI 分析已关闭，仅事件触发",
+                0);
+        }
+
         if (!evaluation.IsDue)
         {
             return GateSchedulingDecision.Waiting(

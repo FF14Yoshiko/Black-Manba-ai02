@@ -1037,7 +1037,7 @@ public sealed class MapTacticalGraphService
         var worldX = (point.TextureX - 1024f) / transform.Scale - transform.OffsetX;
         var worldZ = (point.TextureY - 1024f) / transform.Scale - transform.OffsetY;
 
-        return new MapAnnotationPoint
+        var annotation = new MapAnnotationPoint
         {
             Id = $"{BuiltInPointPrefix}{definition.Key}.{index:000}",
             Kind = point.Kind,
@@ -1050,6 +1050,9 @@ public sealed class MapTacticalGraphService
             RiskScore = Math.Clamp(point.RiskScore, 0, 100),
             CreatedAtUnixMs = index + 1
         };
+
+        BuiltInMapPointTuning.Apply(definition.MapType, annotation);
+        return annotation;
     }
 
     private static MapAnnotationPoint ToCustomPoint(MapAnnotationPoint point, int index)
@@ -1458,7 +1461,7 @@ public sealed class MapTacticalGraphService
         var name = ResolveGraphMapName(definition?.MapName, customDocument?.MapName);
         var customText = customDocument == null ? string.Empty : $"；已加载自定义图谱，保存时间 {customDocument.UpdatedAtUnixMs}";
         var note = definition?.Note ?? "当前地图使用自定义战术图谱。";
-        return $"{BuiltInVersion}：{name}，节点 {pointCount}，区域 {regionCount}，路径图形 {pathCount}，{projection}{customText}。{note}";
+        return $"{BuiltInVersion}：{name}，节点 {pointCount}，区域 {regionCount}，通行图形 {pathCount}，{projection}{customText}。{note}";
     }
 
     private static string BuildCoverageText(
@@ -1481,8 +1484,9 @@ public sealed class MapTacticalGraphService
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Count();
         var dangerCount = points.Count(point => point.Kind == MapAnnotationKind.Danger);
+        var oneWayCount = paths.Count(path => path.IsOneWay);
 
-        return $"覆盖：图形区域 {regions.Count}，路径图形 {paths.Count}，路径 {routeCount}，卡口 {chokeCount}，高低差 {heightCount}，跳台 {jumpPadCount}，传送 {teleporterCount}，绕后路径 {flankRouteCount}，危险区 {dangerCount}";
+        return $"覆盖：图形区域 {regions.Count}，通行图形 {paths.Count}，通行分段 {routeCount}，卡口 {chokeCount}，高低差 {heightCount}，跳台 {jumpPadCount}，传送 {teleporterCount}，侧翼入口 {flankRouteCount}，危险区 {dangerCount}，单向通道 {oneWayCount}";
     }
 
     private static bool IsRegionKind(MapAnnotationKind kind)

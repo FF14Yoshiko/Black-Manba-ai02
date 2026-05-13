@@ -5,7 +5,7 @@
     "Punchline": "把战场读懂，再把下一步说清楚。",
     "Description": "纷争前线的战场态势感知、本地即时战术决策、LLM 大决策、战术图谱与战斗指挥界面。",
     "InternalName": "ai02",
-    "AssemblyVersion": "1.2.1.0",
+    "AssemblyVersion": "1.2.2.0",
     "ApplicableVersion": "any",
     "DalamudApiLevel": 15,
     "IsHide": false,
@@ -17,7 +17,7 @@
     "DownloadLinkInstall": "https://github.com/FF14Yoshiko/Black-Manba-ai02/releases/latest/download/latest.zip",
     "DownloadLinkUpdate": "https://github.com/FF14Yoshiko/Black-Manba-ai02/releases/latest/download/latest.zip",
     "DownloadCount": 0,
-    "LastUpdate": 1778623074,
+    "LastUpdate": 1778693548,
     "Tags": [
       "frontline",
       "radar",
